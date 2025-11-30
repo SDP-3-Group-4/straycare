@@ -39,7 +39,7 @@ Urban areas face significant challenges with stray animal injuries, abandonment,
 | AI (Vet Bot)     | Large Language Model API (e.g., LLaMA, GPT)  |
 | AI (Breed Detection) | TensorFlow Lite                             |
 | Geolocation      | Google Maps API                               |
-| Payment Gateway  | Stripe (or similar)                           |
+| Payment Gateway  | SSLCOMMERZE (or similar)                           |
 
 ---
 
