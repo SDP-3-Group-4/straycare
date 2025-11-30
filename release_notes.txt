@@ -1,0 +1,7 @@
+🚀 Beta Launch Prep (Alpha 1.0.0+3)
+---------------------
+👤 Profile: Frontend finalized for Beta.
+🌙 Visuals: Dark Mode is now globally supported.
+⚙️ Settings: Complete implementation with Multilingual support (Beta).
+🎨 UI Polish: Improved Chat & Feed frontends.
+🐛 Fixes: Squashed several bugs.

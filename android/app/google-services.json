@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "167700736671",
+    "project_id": "straycare-dev",
+    "storage_bucket": "straycare-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:167700736671:android:f1b0eac50a29ba442390aa",
+        "android_client_info": {
+          "package_name": "com.example.straycare_demo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "167700736671-tfiu1fi0uv5d5e0ojri7r1njvp9h57qd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.straycare_demo",
+            "certificate_hash": "fc6914e6e94c66bd7ec3a8a5f13fa734779ce2cc"
+          }
+        },
+        {
+          "client_id": "167700736671-c3n8piqj237k3kvj1e22gl7okcupj1fg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsd-e1ZVtycyafIsde5rxB5PMMkCv0Cck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "167700736671-c3n8piqj237k3kvj1e22gl7okcupj1fg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

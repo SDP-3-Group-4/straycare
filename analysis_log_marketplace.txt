@@ -1,0 +1,8 @@
+Analyzing marketplace_screen.dart...                            
+
+   info - Parameter 'key' could be a super parameter - lib\features\marketplace\marketplace_screen.dart:9:9 - use_super_parameters
+warning - The value of the local variable 'primaryColor' isn't used - lib\features\marketplace\marketplace_screen.dart:63:11 - unused_local_variable
+   info - Unnecessary use of 'toList' in a spread - lib\features\marketplace\marketplace_screen.dart:187:32 - unnecessary_to_list_in_spreads
+   info - Parameter 'key' could be a super parameter - lib\features\marketplace\marketplace_screen.dart:260:9 - use_super_parameters
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\marketplace\marketplace_screen.dart:369:47 - deprecated_member_use
+
