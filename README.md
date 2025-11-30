@@ -35,7 +35,7 @@ Urban areas face significant challenges with stray animal injuries, abandonment,
 | Category         | Technology                                    |
 |------------------|-----------------------------------------------|
 | Frontend         | Flutter                                       |
-| Backend          | Firebase (Cloud Firestore, Cloud Functions, Authentication, Storage) |
+| Backend          | Firebase (Authentication, Cache Storage), MongoDB Atlas (Database), Python Django, FastAPI Dart Frog, Google Cloud Functions and APIs |
 | AI (Vet Bot)     | Proprietary fine-tuned LoRA LLM API (e.g. Anvil AI)  |
 | AI (Breed Detection) | TensorFlow Lite                             |
 | Geolocation      | Google Maps API                               |
