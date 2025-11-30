@@ -7,6 +7,7 @@ import 'package:straycare_demo/features/auth/login_screen.dart';
 import 'package:straycare_demo/features/settings/settings_screen.dart';
 import 'package:straycare_demo/features/profile/widgets/edit_profile_sheet.dart';
 import 'package:straycare_demo/services/auth_service.dart';
+import 'package:straycare_demo/features/profile/vet_verification_screen.dart';
 
 import '../../l10n/app_localizations.dart';
 
@@ -218,6 +219,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ),
                                   );
+                                } else if (value == 'become_merchant') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Become a Merchant: Coming soon!',
+                                      ),
+                                    ),
+                                  );
+                                } else if (value == 'verify_vet') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const VetVerificationScreen(),
+                                    ),
+                                  );
                                 }
                               },
                               itemBuilder: (BuildContext context) =>
@@ -233,6 +250,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           AppLocalizations.of(
                                             context,
                                           ).translate('settings_title'),
+                                        ),
+                                        contentPadding: EdgeInsets.zero,
+                                        dense: true,
+                                      ),
+                                    ),
+                                    PopupMenuItem<String>(
+                                      value: 'become_merchant',
+                                      child: ListTile(
+                                        leading: Icon(
+                                          Icons.store,
+                                          color: Color(0xFF6c7278),
+                                        ),
+                                        title: const Text('Become a Merchant'),
+                                        contentPadding: EdgeInsets.zero,
+                                        dense: true,
+                                      ),
+                                    ),
+                                    PopupMenuItem<String>(
+                                      value: 'verify_vet',
+                                      child: ListTile(
+                                        leading: Icon(
+                                          Icons.verified_user,
+                                          color: Color(0xFF6c7278),
+                                        ),
+                                        title: const Text(
+                                          'Get Verified as a Vet',
                                         ),
                                         contentPadding: EdgeInsets.zero,
                                         dense: true,

@@ -475,7 +475,6 @@ class _PostCardState extends State<PostCard> {
       context: context,
       builder: (ctx) => DonationInputDialog(
         postTitle: widget.postContent,
-        fundraiserName: widget.userName,
         onDonate: (amount) {
           // Create a temporary cart object for the donation
           final donationItem = _createDonationItem(amount);
@@ -497,29 +496,6 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  void _showUserProfile() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'User Profile',
-      barrierColor: Colors.black.withOpacity(0.5),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return UserProfileDialog(
-          userName: widget.userName,
-          userAvatarUrl: widget.userAvatarUrl,
-          isVerified: widget.category == PostCategory.rescue, // Mock logic
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return ScaleTransition(
-          scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-          child: FadeTransition(opacity: animation, child: child),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isFundraise = widget.category == PostCategory.fundraise;
@@ -535,73 +511,55 @@ class _PostCardState extends State<PostCard> {
             children: <Widget>[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: <Widget>[
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage: NetworkImage(widget.userAvatarUrl),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.secondary.withValues(alpha: 0.2),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: InkWell(
-                      onTap: _showUserProfile,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundImage: NetworkImage(
-                                widget.userAvatarUrl,
-                              ),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondary.withValues(alpha: 0.2),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    widget.userName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    widget.timeAgo,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (widget.location.isNotEmpty)
-                                    Row(
-                                      children: <Widget>[
-                                        Icon(
-                                          Icons.location_on,
-                                          size: 12,
-                                          color: Colors.grey[600],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            widget.location,
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          widget.userName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
+                        Text(
+                          widget.timeAgo,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (widget.location.isNotEmpty)
+                          Row(
+                            children: <Widget>[
+                              Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  widget.location,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -823,13 +781,11 @@ class DonationProgress extends StatelessWidget {
 //
 class DonationInputDialog extends StatefulWidget {
   final String postTitle;
-  final String fundraiserName;
   final Function(double) onDonate;
 
   const DonationInputDialog({
     Key? key,
     required this.postTitle,
-    required this.fundraiserName,
     required this.onDonate,
   }) : super(key: key);
 
@@ -861,91 +817,44 @@ class _DonationInputDialogState extends State<DonationInputDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        AppLocalizations.of(context).translate('donate'),
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        '${AppLocalizations.of(context).translate('donate_to')} ${widget.postTitle}',
       ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Decorated Box for Fundraiser Info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).primaryColor.withOpacity(0.3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.volunteer_activism,
-                          color: Theme.of(context).primaryColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Donating to ${widget.fundraiserName}",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.payment, color: Colors.grey[700], size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Payment Method: bKash / Card",
-                          style: TextStyle(
-                            color: Colors.grey[800],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(context).translate('enter_donation_amount'),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
               ),
-              const SizedBox(height: 16),
-              Text(
-                AppLocalizations.of(context).translate('enter_donation_amount'),
-                style: Theme.of(context).textTheme.bodyMedium,
+              decoration: const InputDecoration(
+                hintText: 'e.g. 500',
+                prefixText: '৳ ',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. 500',
-                  prefixText: '৳ ',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return AppLocalizations.of(
+                    context,
+                  ).translate('please_enter_amount');
+                }
+                if (double.tryParse(value) == null) {
+                  return AppLocalizations.of(
+                    context,
+                  ).translate('please_enter_valid_number');
+                }
+                return null;
+              },
+            ),
+          ],
         ),
       ),
       actions: [
@@ -1228,40 +1137,26 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            // decoration: BoxDecoration(
-            //   border: Border(
-            //     bottom: BorderSide(
-            //       color: const Color.fromARGB(
-            //         255,
-            //         167,
-            //         21,
-            //         21,
-            //       ).withOpacity(0.2),
-            //     ),
-            //   ),
-            // ),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.withOpacity(0.2)),
+              ),
+            ),
             child: Center(
               child: Container(
-                //add padding
-                //padding: const EdgeInsets.symmetric(vertical: 12),
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6B46C1),
+                  color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(
-              left: 8.0,
-              right: 8.0,
-              top: 1.2,
-              bottom: 16.0,
-            ),
+            padding: const EdgeInsets.all(16.0),
             child: Text(
-              AppLocalizations.of(context).translate('comments'),
+              'Comments',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -1271,7 +1166,7 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
             child: _localComments.isEmpty
                 ? Center(
                     child: Text(
-                      AppLocalizations.of(context).translate('no_comments_yet'),
+                      'No comments yet. Be the first!',
                       style: TextStyle(color: Colors.grey[500]),
                     ),
                   )
@@ -1325,12 +1220,8 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                       focusNode: _focusNode,
                       decoration: InputDecoration(
                         hintText: _editingCommentId != null
-                            ? AppLocalizations.of(
-                                context,
-                              ).translate('edit_comment_hint')
-                            : AppLocalizations.of(
-                                context,
-                              ).translate('leave_comment_hint'),
+                            ? 'Edit comment...'
+                            : 'Leave a comment...',
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
@@ -1364,22 +1255,19 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2.0),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: NetworkImage(comment.userAvatarUrl),
-              backgroundColor: Colors.grey[200],
-            ),
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: NetworkImage(comment.userAvatarUrl),
+            backgroundColor: Colors.grey[200],
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.grey[800]
-                    : Colors.grey[200],
+                    : Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -1387,7 +1275,6 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         comment.userName,
@@ -1397,69 +1284,53 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                         ),
                       ),
                       if (comment.isCurrentUser)
-                        SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: PopupMenuButton<String>(
-                            padding: EdgeInsets.zero,
-                            icon: Icon(
-                              Icons.more_horiz,
-                              size: 16,
-                              color: Colors.grey[600],
-                            ),
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _startEditing(comment);
-                              } else if (value == 'delete') {
-                                _deleteComment(comment.id);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'edit',
-                                height: 32,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.edit, size: 16),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      ).translate('edit'),
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                height: 32,
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.delete,
-                                      size: 16,
-                                      color: Colors.red,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      ).translate('delete'),
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            Icons.more_horiz,
+                            size: 16,
+                            color: Colors.grey[600],
                           ),
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _startEditing(comment);
+                            } else if (value == 'delete') {
+                              _deleteComment(comment.id);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete,
+                                    size: 16,
+                                    color: Colors.red,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     comment.content,
                     style: TextStyle(
@@ -1473,213 +1344,6 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class UserProfileDialog extends StatelessWidget {
-  final String userName;
-  final String userAvatarUrl;
-  final String userBio;
-  final int postsCount;
-  final int connectionsCount;
-  final bool isVerified;
-
-  const UserProfileDialog({
-    super.key,
-    required this.userName,
-    required this.userAvatarUrl,
-    this.userBio = "Pet lover & enthusiast 🐾",
-    this.postsCount = 12,
-    this.connectionsCount = 154,
-    this.isVerified = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.85,
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6B46C1), Color(0xFFA78BFA)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Avatar
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundImage: NetworkImage(userAvatarUrl),
-                        backgroundColor: Colors.grey[200],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Name & Badge
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          userName,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (isVerified) ...[
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.verified,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "@${userName.replaceAll(' ', '').toLowerCase()}",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Bio
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        userBio,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Stats
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatItem("Posts", postsCount.toString()),
-                        Container(
-                          height: 30,
-                          width: 1,
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                        _buildStatItem(
-                          "Connections",
-                          connectionsCount.toString(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    // Connect Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement connect logic
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Connection request sent!"),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.person_add,
-                          color: Color(0xFF6B46C1),
-                        ),
-                        label: const Text(
-                          "Connect",
-                          style: TextStyle(
-                            color: Color(0xFF6B46C1),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Close Button
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.8)),
-        ),
-      ],
     );
   }
 }
