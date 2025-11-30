@@ -851,8 +851,8 @@ class _DonationInputDialogState extends State<DonationInputDialog> {
     if (_formKey.currentState!.validate()) {
       final amount = double.tryParse(_amountController.text) ?? 0.0;
       if (amount > 0) {
+        Navigator.of(context).pop(); // Pop first
         widget.onDonate(amount);
-        Navigator.of(context).pop();
       }
     }
   }

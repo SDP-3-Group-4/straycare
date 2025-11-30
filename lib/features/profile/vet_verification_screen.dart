@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
@@ -156,10 +157,25 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Get Verified as a Professional Vet',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/doctor.svg',
+                    height: 28,
+                    width: 28,
+                    colorFilter: ColorFilter.mode(
+                      Theme.of(context).textTheme.bodyLarge!.color!,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Get Verified',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
@@ -315,7 +331,8 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
               InkWell(
                 onTap: _pickDocument,
                 child: Container(
-                  height: 150,
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
@@ -331,25 +348,21 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
                               color: Colors.red[400],
                             ),
                             const SizedBox(height: 8),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
+                            Text(
+                              _documentFile!.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87, // Fixed visibility
                               ),
-                              child: Text(
-                                _documentFile!.name,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '${(_documentFile!.size / 1024).toStringAsFixed(2)} KB',
-                              style: TextStyle(
-                                color: Colors.grey[600],
+                              style: const TextStyle(
+                                color: Colors.black54, // Fixed visibility
                                 fontSize: 12,
                               ),
                             ),
@@ -358,6 +371,9 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
                               onPressed: _pickDocument,
                               icon: const Icon(Icons.change_circle),
                               label: const Text('Change File'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Theme.of(context).primaryColor,
+                              ),
                             ),
                           ],
                         )

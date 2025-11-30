@@ -3,6 +3,7 @@ import 'package:straycare_demo/features/marketplace/models/marketplace_category.
 import '../models/marketplace_model.dart';
 import '../services/marketplace_service.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../widgets/appointment_booking_sheet.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final MarketplaceItem product;
@@ -382,7 +383,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
+                                  color: theme.brightness == Brightness.dark
+                                      ? Colors.grey[800]
+                                      : Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -417,14 +420,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             : () async {
                                 if (isService) {
                                   // Handle booking appointment logic
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppLocalizations.of(
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => AppointmentBookingSheet(
+                                      onBook: (data) {
+                                        // Mock booking success
+                                        ScaffoldMessenger.of(
                                           context,
-                                        ).translate('booking_not_implemented'),
-                                      ),
-                                      backgroundColor: Colors.blue,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Appointment booked for ${data['petName']} on ${data['date'].day}/${data['date'].month} at ${data['time'].format(context)}',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      },
                                     ),
                                   );
                                 } else {

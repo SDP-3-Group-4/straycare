@@ -72,9 +72,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = true);
 
     try {
+      // Simulate Payment Gateway for non-COD methods
+      if (_selectedMethod != PaymentMethod.cashOnDelivery) {
+        // Simulate network delay for redirection
+        await Future.delayed(const Duration(seconds: 15));
+
+        // In a real app, we would navigate to a WebView or SDK here
+        // For demo, we just proceed to create order after "payment"
+      }
+
       final order = await widget.service.createOrder(
         _addressController.text,
         _selectedMethod,
+        fromCart: widget.cart,
       );
 
       if (mounted) {
@@ -274,7 +284,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           borderSide: BorderSide(color: primaryColor),
                         ),
                         filled: true,
-                        fillColor: Colors.grey.shade50,
+                        fillColor: theme.brightness == Brightness.dark
+                            ? Colors.grey[800]
+                            : Colors.grey.shade50,
                       ),
                     ),
                   ],
@@ -293,11 +305,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                   const SizedBox(height: 12),
                   ...PaymentMethod.values
-                      .where(
-                        (method) =>
-                            hasPhysicalProducts ||
-                            method != PaymentMethod.cashOnDelivery,
-                      )
+                      .where((method) {
+                        if (isDonation) {
+                          // Only allow Mobile Money and Bank Transfer for donations
+                          return method == PaymentMethod.mobileMoney ||
+                              method == PaymentMethod.bankTransfer;
+                        }
+                        return hasPhysicalProducts ||
+                            method != PaymentMethod.cashOnDelivery;
+                      })
                       .map(
                         (method) => PaymentMethodTile(
                           method: method,
@@ -490,105 +506,170 @@ class OrderSuccessDialog extends StatelessWidget {
 
   const OrderSuccessDialog({Key? key, required this.order}) : super(key: key);
 
+  String _getMethodName(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.creditCard:
+        return 'Credit Card';
+      case PaymentMethod.debitCard:
+        return 'Debit Card';
+      case PaymentMethod.mobileMoney:
+        return 'Mobile Money';
+      case PaymentMethod.bankTransfer:
+        return 'Bank Transfer';
+      case PaymentMethod.cashOnDelivery:
+        return 'Cash on Delivery';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final isDonation = order.items.any(
+      (item) => item.item.category == MarketplaceCategory.donation,
+    );
+
+    // Use specialized dialog for donations
+    if (isDonation) {
+      return DonationSuccessDialog(order: order);
+    }
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      insetPadding: const EdgeInsets.all(20),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.green.withOpacity(0.1),
               ),
               child: const Center(
-                child: Icon(Icons.check_circle, color: Colors.green, size: 50),
+                child: Icon(Icons.check_circle, color: Colors.green, size: 40),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
               'Order Confirmed!',
+              textAlign: TextAlign.center,
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            Text(
+              'Your order has been placed successfully.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
+                color: isDark ? Colors.grey[800] : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey.shade200,
+                ),
               ),
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Order ID',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      Text(
-                        order.id,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  _buildDetailRow(
+                    context,
+                    'Order ID',
+                    order.id,
+                    isDark,
+                    isMono: true,
                   ),
-                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
+                  _buildDetailRow(
+                    context,
+                    'Payment Method',
+                    _getMethodName(order.paymentMethod),
+                    isDark,
+                  ),
+                  if (order.shippingAddress.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1),
+                    ),
+                    _buildDetailRow(
+                      context,
+                      'Delivery To',
+                      order.shippingAddress,
+                      isDark,
+                    ),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Total Amount',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark
+                              ? Colors.grey[400]
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
                         'BDT ${order.total.toStringAsFixed(2)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: primaryColor,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Status',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark
+                              ? Colors.grey[400]
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 4,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.amber.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           'Pending',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: Colors.amber.shade700,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -597,18 +678,20 @@ class OrderSuccessDialog extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 54,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text(
@@ -620,6 +703,228 @@ class OrderSuccessDialog extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    bool isDark, {
+    bool isMono = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: isDark ? Colors.grey[400] : Colors.grey.shade600,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+            fontFamily: isMono ? 'monospace' : null,
+            height: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class DonationSuccessDialog extends StatelessWidget {
+  final Order order;
+
+  const DonationSuccessDialog({Key? key, required this.order})
+    : super(key: key);
+
+  String _getMethodName(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.creditCard:
+        return 'Credit Card';
+      case PaymentMethod.debitCard:
+        return 'Debit Card';
+      case PaymentMethod.mobileMoney:
+        return 'Mobile Money';
+      case PaymentMethod.bankTransfer:
+        return 'Bank Transfer';
+      case PaymentMethod.cashOnDelivery:
+        return 'Cash on Delivery';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
+    final recipient = order.items.first.item.seller;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      insetPadding: const EdgeInsets.all(20),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.pink.withOpacity(0.1),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.volunteer_activism,
+                  color: Colors.pink,
+                  size: 40,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Donation Successful!',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your donation has been received.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[800] : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey.shade200,
+                ),
+              ),
+              child: Column(
+                children: [
+                  _buildDetailRow(
+                    context,
+                    'Donation ID',
+                    order.id,
+                    isDark,
+                    isMono: true,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
+                  _buildDetailRow(context, 'Recipient', recipient, isDark),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
+                  _buildDetailRow(
+                    context,
+                    'Payment Method',
+                    _getMethodName(order.paymentMethod),
+                    isDark,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Amount',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark
+                              ? Colors.grey[400]
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        'BDT ${order.total.toStringAsFixed(2)}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Back to Home',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    bool isDark, {
+    bool isMono = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: isDark ? Colors.grey[400] : Colors.grey.shade600,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+            fontFamily: isMono ? 'monospace' : null,
+            height: 1.3,
+          ),
+        ),
+      ],
     );
   }
 }

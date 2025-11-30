@@ -345,21 +345,71 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CartScreen(service: service),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CartScreen(service: service),
+                              ),
+                            );
+                            // Refresh cart count when returning
+                            if (context.mounted) {
+                              (context as Element).markNeedsBuild();
+                            }
+                          },
+                          icon: Icon(
+                            Icons.shopping_cart,
+                            size: 28, // Increased size
+                            color:
+                                theme.appBarTheme.iconTheme?.color ??
+                                theme.iconTheme.color,
                           ),
-                        );
-                      },
-                      icon: Icon(
-                        Icons.shopping_cart,
-                        color:
-                            theme.appBarTheme.iconTheme?.color ??
-                            theme.iconTheme.color,
-                      ),
+                        ),
+                        FutureBuilder<Cart>(
+                          future: service.getCart(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData ||
+                                snapshot.data!.items.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+
+                            final itemCount = snapshot.data!.items.fold<int>(
+                              0,
+                              (sum, item) => sum + item.quantity,
+                            );
+
+                            return Positioned(
+                              right: 4, // Adjusted position
+                              top: 4, // Adjusted position
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 18, // Slightly larger badge
+                                  minHeight: 18,
+                                ),
+                                child: Text(
+                                  '$itemCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11, // Slightly larger text
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -32,8 +32,9 @@ abstract class MarketplaceService {
   /// Create order from cart
   Future<Order> createOrder(
     String shippingAddress,
-    PaymentMethod paymentMethod,
-  );
+    PaymentMethod paymentMethod, {
+    Cart? fromCart,
+  });
 
   /// Get order history
   Future<List<Order>> getOrderHistory();
@@ -44,10 +45,14 @@ abstract class MarketplaceService {
 
 /// Local implementation (demo)
 class LocalMarketplaceService implements MarketplaceService {
-  final List<MarketplaceItem> _items = [];
-  late Cart _cart;
+  static final LocalMarketplaceService _instance =
+      LocalMarketplaceService._internal();
 
-  LocalMarketplaceService() {
+  factory LocalMarketplaceService() {
+    return _instance;
+  }
+
+  LocalMarketplaceService._internal() {
     _initializeSampleData();
     _cart = Cart(
       userId: 'user_current',
@@ -56,6 +61,9 @@ class LocalMarketplaceService implements MarketplaceService {
       updatedAt: DateTime.now(),
     );
   }
+
+  final List<MarketplaceItem> _items = [];
+  late Cart _cart;
 
   void _initializeSampleData() {
     _items.addAll([
@@ -323,22 +331,26 @@ class LocalMarketplaceService implements MarketplaceService {
   @override
   Future<Order> createOrder(
     String shippingAddress,
-    PaymentMethod paymentMethod,
-  ) async {
+    PaymentMethod paymentMethod, {
+    Cart? fromCart,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 500));
+    final cartToUse = fromCart ?? _cart;
     final order = Order(
       id: 'order_${DateTime.now().millisecondsSinceEpoch}',
-      userId: _cart.userId,
-      items: _cart.items,
-      subtotal: _cart.subtotal,
-      tax: _cart.tax,
-      total: _cart.total,
+      userId: cartToUse.userId,
+      items: cartToUse.items,
+      subtotal: cartToUse.subtotal,
+      tax: cartToUse.tax,
+      total: cartToUse.total,
       status: OrderStatus.pending,
       paymentMethod: paymentMethod,
       shippingAddress: shippingAddress,
       createdAt: DateTime.now(),
     );
-    await clearCart();
+    if (fromCart == null) {
+      await clearCart();
+    }
     return order;
   }
 
