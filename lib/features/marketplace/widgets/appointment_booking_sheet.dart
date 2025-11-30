@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../l10n/app_localizations.dart';
 
 class AppointmentBookingSheet extends StatefulWidget {
   final Function(Map<String, dynamic>) onBook;
@@ -89,7 +88,6 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: EdgeInsets.only(
