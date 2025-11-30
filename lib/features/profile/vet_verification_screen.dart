@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
-
 
 class VetVerificationScreen extends StatefulWidget {
   const VetVerificationScreen({super.key});
@@ -19,7 +19,7 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
 
   DateTime? _selectedDate;
   File? _profileImage;
-  File? _documentImage;
+  PlatformFile? _documentFile;
   final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
 
@@ -47,22 +47,37 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
     }
   }
 
-  Future<void> _pickImage(bool isProfile) async {
+  Future<void> _pickProfileImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          if (isProfile) {
-            _profileImage = File(image.path);
-          } else {
-            _documentImage = File(image.path);
-          }
+          _profileImage = File(image.path);
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null) {
+        setState(() {
+          _documentFile = result.files.first;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking document: $e')));
     }
   }
 
@@ -80,9 +95,11 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
         );
         return;
       }
-      if (_documentImage == null) {
+      if (_documentFile == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please upload verification documents')),
+          const SnackBar(
+            content: Text('Please upload verification documents (PDF)'),
+          ),
         );
         return;
       }
@@ -187,7 +204,7 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
                       bottom: 0,
                       right: 0,
                       child: InkWell(
-                        onTap: () => _pickImage(true),
+                        onTap: _pickProfileImage,
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -296,7 +313,7 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
               ),
               const SizedBox(height: 8),
               InkWell(
-                onTap: () => _pickImage(false),
+                onTap: _pickDocument,
                 child: Container(
                   height: 150,
                   decoration: BoxDecoration(
@@ -304,14 +321,45 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey[300]!),
                   ),
-                  child: _documentImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _documentImage!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          ),
+                  child: _documentFile != null
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.picture_as_pdf,
+                              size: 50,
+                              color: Colors.red[400],
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
+                              child: Text(
+                                _documentFile!.name,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(_documentFile!.size / 1024).toStringAsFixed(2)} KB',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: _pickDocument,
+                              icon: const Icon(Icons.change_circle),
+                              label: const Text('Change File'),
+                            ),
+                          ],
                         )
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -327,7 +375,7 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
                               style: TextStyle(color: Colors.grey[600]),
                             ),
                             Text(
-                              '(Image format only)',
+                              '(PDF format only)',
                               style: TextStyle(
                                 color: Colors.grey[500],
                                 fontSize: 12,
