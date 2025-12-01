@@ -377,6 +377,8 @@ class PostCard extends StatefulWidget {
   final double? raisedAmount;
   final double? goalAmount;
   final int? donorCount;
+  final bool isSaved;
+  final VoidCallback? onSave;
 
   const PostCard({
     Key? key,
@@ -392,6 +394,8 @@ class PostCard extends StatefulWidget {
     this.raisedAmount,
     this.goalAmount,
     this.donorCount,
+    this.isSaved = false,
+    this.onSave,
   }) : super(key: key);
 
   @override
@@ -402,6 +406,7 @@ class _PostCardState extends State<PostCard> {
   bool _isLiked = false;
   late int _currentLikes;
   late int _currentCommentCount;
+  late bool _isSaved;
   List<Comment> _comments = [];
 
   @override
@@ -409,6 +414,7 @@ class _PostCardState extends State<PostCard> {
     super.initState();
     _currentLikes = widget.likes;
     _currentCommentCount = widget.comments;
+    _isSaved = widget.isSaved;
     _initializeComments();
   }
 
@@ -696,10 +702,15 @@ class _PostCardState extends State<PostCard> {
                   ),
                   IconButton(
                     icon: Icon(
-                      Icons.bookmark_border,
+                      _isSaved ? Icons.bookmark : Icons.bookmark_border,
                       color: Theme.of(context).primaryColor,
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      setState(() {
+                        _isSaved = !_isSaved;
+                      });
+                      widget.onSave?.call();
+                    },
                   ),
                 ],
               ),

@@ -17,6 +17,7 @@ class MarketplaceItem {
   final int stockCount;
   final List<String> features;
   final String deliveryTime;
+  final String? location;
 
   MarketplaceItem({
     required this.id,
@@ -33,6 +34,7 @@ class MarketplaceItem {
     required this.stockCount,
     required this.features,
     required this.deliveryTime,
+    this.location,
   });
 
   /// Convert to JSON for backend
@@ -52,6 +54,7 @@ class MarketplaceItem {
       'stockCount': stockCount,
       'features': features,
       'deliveryTime': deliveryTime,
+      'location': location,
     };
   }
 
@@ -75,6 +78,7 @@ class MarketplaceItem {
       stockCount: json['stockCount'] as int? ?? 0,
       features: List<String>.from(json['features'] as List? ?? []),
       deliveryTime: json['deliveryTime'] as String? ?? '2-3 days',
+      location: json['location'] as String?,
     );
   }
 }
@@ -84,12 +88,14 @@ class CartItem {
   final MarketplaceItem item;
   int quantity;
   final DateTime addedAt;
+  final Map<String, dynamic>? metadata;
 
   CartItem({
     required this.id,
     required this.item,
     required this.quantity,
     required this.addedAt,
+    this.metadata,
   });
 
   double get totalPrice => item.price * quantity;
@@ -100,6 +106,7 @@ class CartItem {
       'item': item.toJson(),
       'quantity': quantity,
       'addedAt': addedAt.toIso8601String(),
+      'metadata': metadata,
     };
   }
 
@@ -109,6 +116,7 @@ class CartItem {
       item: MarketplaceItem.fromJson(json['item'] as Map<String, dynamic>),
       quantity: json['quantity'] as int,
       addedAt: DateTime.parse(json['addedAt'] as String),
+      metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
 }

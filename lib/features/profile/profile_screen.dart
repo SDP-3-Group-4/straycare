@@ -8,6 +8,8 @@ import 'package:straycare_demo/features/settings/settings_screen.dart';
 import 'package:straycare_demo/features/profile/widgets/edit_profile_sheet.dart';
 import 'package:straycare_demo/services/auth_service.dart';
 import 'package:straycare_demo/features/profile/vet_verification_screen.dart';
+import 'package:straycare_demo/features/profile/screens/saved_posts_screen.dart';
+import 'package:straycare_demo/features/profile/screens/order_history_screen.dart';
 
 import '../../l10n/app_localizations.dart';
 
@@ -200,23 +202,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   );
                                 } else if (value == 'saved_items') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppLocalizations.of(
-                                          context,
-                                        ).translate('saved_items'),
-                                      ),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SavedPostsScreen(),
                                     ),
                                   );
                                 } else if (value == 'order_history') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppLocalizations.of(
-                                          context,
-                                        ).translate('order_history'),
-                                      ),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const OrderHistoryScreen(),
                                     ),
                                   );
                                 } else if (value == 'become_merchant') {

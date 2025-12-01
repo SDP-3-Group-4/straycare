@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import '../models/marketplace_category.dart';
 
 class AppointmentBookingSheet extends StatefulWidget {
   final Function(Map<String, dynamic>) onBook;
+  final MarketplaceCategory category;
 
-  const AppointmentBookingSheet({Key? key, required this.onBook})
-    : super(key: key);
+  const AppointmentBookingSheet({
+    Key? key,
+    required this.onBook,
+    required this.category,
+  }) : super(key: key);
 
   @override
   State<AppointmentBookingSheet> createState() =>
@@ -21,7 +26,10 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
   final _petWeightController = TextEditingController();
   final _notesController = TextEditingController();
   String _selectedAnimalType = 'Dog';
+  String _appointmentType = 'Physical';
   final List<String> _animalTypes = ['Dog', 'Cat', 'Bird', 'Other'];
+  bool _showDateError = false;
+  bool _showTimeError = false;
 
   @override
   void dispose() {
@@ -56,6 +64,7 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        _showDateError = false;
       });
     }
   }
@@ -81,6 +90,7 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
     if (picked != null && picked != _selectedTime) {
       setState(() {
         _selectedTime = picked;
+        _showTimeError = false;
       });
     }
   }
@@ -88,6 +98,7 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isVet = widget.category == MarketplaceCategory.healthcare;
 
     return Container(
       padding: EdgeInsets.only(
@@ -103,6 +114,7 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
       child: SingleChildScrollView(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,6 +129,32 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
               ),
               const SizedBox(height: 24),
 
+              // Appointment Type (Only for Vet)
+              if (isVet) ...[
+                DropdownButtonFormField<String>(
+                  value: _appointmentType,
+                  decoration: InputDecoration(
+                    labelText: 'Appointment Type',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                  items: ['Physical', 'Virtual'].map((type) {
+                    return DropdownMenuItem(value: type, child: Text(type));
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _appointmentType = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+
               // Date & Time Selection
               Text(
                 'Date & Time',
@@ -126,64 +164,113 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
               ),
               const SizedBox(height: 12),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: InkWell(
-                      onTap: () => _selectDate(context),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: () => _selectDate(context),
                           borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              color: theme.primaryColor,
-                              size: 20,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: _showDateError
+                                    ? Colors.red
+                                    : Colors.grey.shade300,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _selectedDate == null
-                                  ? 'Select Date'
-                                  : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                              style: theme.textTheme.bodyMedium,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today,
+                                  color: _showDateError
+                                      ? Colors.red
+                                      : theme.primaryColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedDate == null
+                                        ? 'Select Date'
+                                        : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: _showDateError ? Colors.red : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_showDateError)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8, top: 4),
+                            child: Text(
+                              'Required',
+                              style: TextStyle(color: Colors.red, fontSize: 12),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: InkWell(
-                      onTap: () => _selectTime(context),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: () => _selectTime(context),
                           borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              color: theme.primaryColor,
-                              size: 20,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: _showTimeError
+                                    ? Colors.red
+                                    : Colors.grey.shade300,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _selectedTime == null
-                                  ? 'Select Time'
-                                  : _selectedTime!.format(context),
-                              style: theme.textTheme.bodyMedium,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  color: _showTimeError
+                                      ? Colors.red
+                                      : theme.primaryColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedTime == null
+                                        ? 'Select Time'
+                                        : _selectedTime!.format(context),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: _showTimeError ? Colors.red : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_showTimeError)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8, top: 4),
+                            child: Text(
+                              'Required',
+                              style: TextStyle(color: Colors.red, fontSize: 12),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -252,6 +339,12 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Req';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                 ],
@@ -268,6 +361,12 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -281,6 +380,12 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Required';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                 ],
@@ -313,20 +418,20 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      if (_selectedDate == null || _selectedTime == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please select date and time'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
+                    setState(() {
+                      _showDateError = _selectedDate == null;
+                      _showTimeError = _selectedTime == null;
+                    });
 
+                    if (_formKey.currentState!.validate() &&
+                        !_showDateError &&
+                        !_showTimeError) {
                       final bookingData = {
                         'date': _selectedDate,
                         'time': _selectedTime,
+                        'appointmentType': isVet
+                            ? _appointmentType
+                            : 'Physical',
                         'petType': _selectedAnimalType,
                         'petName': _petNameController.text,
                         'petAge': _petAgeController.text,
@@ -334,8 +439,11 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                         'petWeight': _petWeightController.text,
                         'notes': _notesController.text,
                       };
-                      widget.onBook(bookingData);
+                      print('DEBUG: Closing sheet');
                       Navigator.pop(context);
+                      print('DEBUG: Calling onBook');
+                      widget.onBook(bookingData);
+                      print('DEBUG: onBook called');
                     }
                   },
                   style: ElevatedButton.styleFrom(

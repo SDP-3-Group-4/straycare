@@ -25,41 +25,35 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
-  bool _isServiceCategory(MarketplaceCategory category) {
-    return category == MarketplaceCategory.healthcare ||
-        category == MarketplaceCategory.grooming ||
-        category == MarketplaceCategory.services ||
-        category == MarketplaceCategory.training ||
-        category == MarketplaceCategory.donation;
+  bool _hasPhysicalProducts() {
+    return widget.cart.items.any((item) {
+      final category = item.item.category;
+      return category != MarketplaceCategory.healthcare &&
+          category != MarketplaceCategory.donation;
+    });
   }
 
-  bool _hasPhysicalProducts() {
-    return widget.cart.items.any(
-      (item) => !_isServiceCategory(item.item.category),
-    );
+  bool _isDonationOnly() {
+    return widget.cart.items.length == 1 &&
+        widget.cart.items.first.item.category == MarketplaceCategory.donation;
   }
 
   String _getSummaryTitle() {
-    final bool hasService = widget.cart.items.any(
-      (item) => _isServiceCategory(item.item.category),
-    );
-    final bool hasProduct = _hasPhysicalProducts();
-
-    // Special case for donation
-    if (widget.cart.items.length == 1 &&
-        widget.cart.items.first.item.category == MarketplaceCategory.donation) {
+    if (_isDonationOnly()) {
       return 'Donation Summary';
-    } else if (hasService && hasProduct) {
-      return 'Payment Summary';
-    } else if (hasService) {
-      return 'Booking Summary';
-    } else {
+    } else if (_hasPhysicalProducts()) {
       return 'Order Summary';
+    } else {
+      return 'Booking Summary';
     }
   }
 
   void _processPayment() async {
-    if (_hasPhysicalProducts() && _addressController.text.isEmpty) {
+    print('DEBUG: _processPayment started');
+    final bool requiresAddress = _hasPhysicalProducts();
+
+    if (requiresAddress && _addressController.text.isEmpty) {
+      print('DEBUG: Address required but empty');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter shipping address'),
@@ -72,29 +66,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Simulate Payment Gateway for non-COD methods
+      print('DEBUG: Creating order...');
+      // Simulate Payment Gateway
       if (_selectedMethod != PaymentMethod.cashOnDelivery) {
-        // Simulate network delay for redirection
-        await Future.delayed(const Duration(seconds: 15));
-
-        // In a real app, we would navigate to a WebView or SDK here
-        // For demo, we just proceed to create order after "payment"
+        await Future.delayed(const Duration(seconds: 2));
       }
 
       final order = await widget.service.createOrder(
-        _addressController.text,
+        !requiresAddress
+            ? 'Vet Appointment / Digital Service'
+            : _addressController.text,
         _selectedMethod,
         fromCart: widget.cart,
       );
+      print('DEBUG: Order created: ${order.id}');
 
       if (mounted) {
+        print('DEBUG: Showing success dialog');
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => OrderSuccessDialog(order: order),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('DEBUG: Payment failed: $e\n$stack');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -114,10 +110,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
-    final hasPhysicalProducts = _hasPhysicalProducts();
-    final isDonation =
-        widget.cart.items.length == 1 &&
-        widget.cart.items.first.item.category == MarketplaceCategory.donation;
+    final requiresAddress = _hasPhysicalProducts();
+    final isDonation = _isDonationOnly();
     final donationRecipient = isDonation
         ? widget.cart.items.first.item.seller
         : null;
@@ -168,84 +162,70 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  ...widget.cart.items
-                      .map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
+                  // Display Items
+                  ...widget.cart.items.map((item) {
+                    final isService =
+                        item.item.category == MarketplaceCategory.healthcare;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: Text(
-                                  _isServiceCategory(item.item.category)
+                                  isService
                                       ? item.item.title
                                       : '${item.item.title} × ${item.quantity}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                               Text(
                                 'BDT ${item.totalPrice.toStringAsFixed(2)}',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      )
-                      .toList(),
-                  Divider(color: Colors.grey.shade300, height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Subtotal',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
+                          if (item.metadata != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Date: ${(item.metadata!['date'] as DateTime).day}/${(item.metadata!['date'] as DateTime).month}/${(item.metadata!['date'] as DateTime).year} - Time: ${(item.metadata!['time'] as TimeOfDay).format(context)}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            Text(
+                              'Pet: ${item.metadata!['petName']} (${item.metadata!['petType']})',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ],
                       ),
-                      Text(
-                        'BDT ${widget.cart.subtotal.toStringAsFixed(2)}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                  if (widget.cart.tax > 0) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Tax (5%)',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        Text(
-                          'BDT ${widget.cart.tax.toStringAsFixed(2)}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ],
-                  Divider(color: Colors.grey.shade300, height: 16),
+                    );
+                  }).toList(),
+
+                  Divider(color: Colors.grey.shade300, height: 24),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Total Amount',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         'BDT ${widget.cart.total.toStringAsFixed(2)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: primaryColor,
-                          fontSize: 16,
                         ),
                       ),
                     ],
@@ -253,7 +233,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ],
               ),
             ),
-            if (hasPhysicalProducts)
+
+            if (requiresAddress)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -270,28 +251,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       controller: _addressController,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        hintText: 'Enter your shipping address',
+                        hintText: 'Enter delivery address',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: primaryColor),
                         ),
                         filled: true,
-                        fillColor: theme.brightness == Brightness.dark
-                            ? Colors.grey[800]
-                            : Colors.grey.shade50,
                       ),
                     ),
                   ],
                 ),
               ),
+
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -307,12 +277,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ...PaymentMethod.values
                       .where((method) {
                         if (isDonation) {
-                          // Only allow Mobile Money and Bank Transfer for donations
                           return method == PaymentMethod.mobileMoney ||
                               method == PaymentMethod.bankTransfer;
                         }
-                        return hasPhysicalProducts ||
-                            method != PaymentMethod.cashOnDelivery;
+                        return true;
                       })
                       .map(
                         (method) => PaymentMethodTile(
@@ -329,61 +297,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ],
               ),
             ),
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lock, color: Colors.blue, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Your payment information is secure and encrypted',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+
             Padding(
               padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _isProcessing ? null : _processPayment,
-                  icon: _isProcessing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.payment),
-                  label: Text(
-                    _isProcessing
-                        ? 'Processing...'
-                        : (isDonation
-                              ? 'Complete Donation'
-                              : 'Complete Payment'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: primaryColor.withOpacity(0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                  child: _isProcessing
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          isDonation
+                              ? 'Complete Donation'
+                              : (requiresAddress
+                                    ? 'Place Order'
+                                    : 'Confirm Booking'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -418,7 +359,7 @@ class PaymentMethodTile extends StatelessWidget {
       case PaymentMethod.bankTransfer:
         return 'Bank Transfer';
       case PaymentMethod.cashOnDelivery:
-        return 'Cash on Delivery';
+        return 'Cash on Delivery / Pay at Clinic';
     }
   }
 
@@ -432,7 +373,7 @@ class PaymentMethodTile extends StatelessWidget {
       case PaymentMethod.bankTransfer:
         return Icons.account_balance;
       case PaymentMethod.cashOnDelivery:
-        return Icons.local_shipping;
+        return Icons.money;
     }
   }
 
@@ -456,30 +397,6 @@ class PaymentMethodTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? primaryColor : Colors.grey.shade400,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Center(
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: primaryColor,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
             Icon(
               _getMethodIcon(method),
               color: isSelected ? primaryColor : Colors.grey.shade600,
@@ -494,6 +411,8 @@ class PaymentMethodTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: primaryColor, size: 20),
           ],
         ),
       ),
@@ -506,7 +425,46 @@ class OrderSuccessDialog extends StatelessWidget {
 
   const OrderSuccessDialog({Key? key, required this.order}) : super(key: key);
 
-  String _getMethodName(PaymentMethod method) {
+  String _formatDate(dynamic date) {
+    if (date is DateTime) {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+    return date.toString();
+  }
+
+  String _formatTime(dynamic time, BuildContext context) {
+    if (time is TimeOfDay) {
+      return time.format(context);
+    }
+    return time.toString();
+  }
+
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatPaymentMethod(PaymentMethod method) {
     switch (method) {
       case PaymentMethod.creditCard:
         return 'Credit Card';
@@ -517,414 +475,125 @@ class OrderSuccessDialog extends StatelessWidget {
       case PaymentMethod.bankTransfer:
         return 'Bank Transfer';
       case PaymentMethod.cashOnDelivery:
-        return 'Cash on Delivery';
+        return 'Pay at Clinic / COD';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-    final isDark = theme.brightness == Brightness.dark;
-
     final isDonation = order.items.any(
       (item) => item.item.category == MarketplaceCategory.donation,
     );
-
-    // Use specialized dialog for donations
-    if (isDonation) {
-      return DonationSuccessDialog(order: order);
-    }
+    final isAppointment = order.items.any(
+      (item) => item.item.category == MarketplaceCategory.healthcare,
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      insetPadding: const EdgeInsets.all(20),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 70,
-              height: 70,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
                 color: Colors.green.withOpacity(0.1),
-              ),
-              child: const Center(
-                child: Icon(Icons.check_circle, color: Colors.green, size: 40),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Order Confirmed!',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your order has been placed successfully.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey.shade200,
-                ),
-              ),
-              child: Column(
-                children: [
-                  _buildDetailRow(
-                    context,
-                    'Order ID',
-                    order.id,
-                    isDark,
-                    isMono: true,
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
-                  _buildDetailRow(
-                    context,
-                    'Payment Method',
-                    _getMethodName(order.paymentMethod),
-                    isDark,
-                  ),
-                  if (order.shippingAddress.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(height: 1),
-                    ),
-                    _buildDetailRow(
-                      context,
-                      'Delivery To',
-                      order.shippingAddress,
-                      isDark,
-                    ),
-                  ],
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Amount',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? Colors.grey[400]
-                              : Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        'BDT ${order.total.toStringAsFixed(2)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Status',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? Colors.grey[400]
-                              : Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Pending',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.amber.shade700,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'Back to Home',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    bool isDark, {
-    bool isMono = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isDark ? Colors.grey[400] : Colors.grey.shade600,
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-            fontFamily: isMono ? 'monospace' : null,
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class DonationSuccessDialog extends StatelessWidget {
-  final Order order;
-
-  const DonationSuccessDialog({Key? key, required this.order})
-    : super(key: key);
-
-  String _getMethodName(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.creditCard:
-        return 'Credit Card';
-      case PaymentMethod.debitCard:
-        return 'Debit Card';
-      case PaymentMethod.mobileMoney:
-        return 'Mobile Money';
-      case PaymentMethod.bankTransfer:
-        return 'Bank Transfer';
-      case PaymentMethod.cashOnDelivery:
-        return 'Cash on Delivery';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-    final isDark = theme.brightness == Brightness.dark;
-    final recipient = order.items.first.item.seller;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      insetPadding: const EdgeInsets.all(20),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.pink.withOpacity(0.1),
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.volunteer_activism,
-                  color: Colors.pink,
-                  size: 40,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Donation Successful!',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your donation has been received.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              child: Icon(
+                isDonation ? Icons.volunteer_activism : Icons.check_circle,
+                color: Colors.green,
+                size: 48,
               ),
             ),
             const SizedBox(height: 24),
+            Text(
+              isDonation ? 'Donation Successful!' : 'Booking Confirmed!',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Transaction ID: ${order.id}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 24),
+
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey[800] : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey.shade200,
-                ),
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Column(
                 children: [
                   _buildDetailRow(
                     context,
-                    'Donation ID',
-                    order.id,
-                    isDark,
-                    isMono: true,
+                    'Amount Paid',
+                    'BDT ${order.total.toStringAsFixed(2)}',
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
-                  _buildDetailRow(context, 'Recipient', recipient, isDark),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
+                  const Divider(height: 24),
                   _buildDetailRow(
                     context,
                     'Payment Method',
-                    _getMethodName(order.paymentMethod),
-                    isDark,
+                    _formatPaymentMethod(order.paymentMethod),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Amount',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? Colors.grey[400]
-                              : Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
+
+                  if (isAppointment && order.items.isNotEmpty) ...[
+                    const Divider(height: 24),
+                    if (order.items.first.metadata != null) ...[
+                      _buildDetailRow(
+                        context,
+                        'Date & Time',
+                        '${_formatDate(order.items.first.metadata!['date'])} • ${_formatTime(order.items.first.metadata!['time'], context)}',
                       ),
-                      Text(
-                        'BDT ${order.total.toStringAsFixed(2)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: primaryColor,
-                        ),
+                      const SizedBox(height: 12),
+                      _buildDetailRow(
+                        context,
+                        'Pet',
+                        '${order.items.first.metadata!['petName']} (${order.items.first.metadata!['petType']})',
                       ),
                     ],
-                  ),
+                    if (order.items.first.item.location != null) ...[
+                      const SizedBox(height: 12),
+                      _buildDetailRow(
+                        context,
+                        'Location',
+                        order.items.first.item.location!,
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              height: 54,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Back to Home',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: const Text('Back to Home'),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    bool isDark, {
-    bool isMono = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isDark ? Colors.grey[400] : Colors.grey.shade600,
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-            fontFamily: isMono ? 'monospace' : null,
-            height: 1.3,
-          ),
-        ),
-      ],
     );
   }
 }

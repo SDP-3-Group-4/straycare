@@ -203,6 +203,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
                   ),
+                  if (widget.product.location != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppLocalizations.of(
+                                  context,
+                                ).translate('location'),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.product.location!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   if (widget.product.inStock)
                     Container(
@@ -425,17 +465,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
                                     builder: (context) => AppointmentBookingSheet(
+                                      category: widget.product.category,
                                       onBook: (data) {
-                                        // Mock booking success
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Appointment booked for ${data['petName']} on ${data['date'].day}/${data['date'].month} at ${data['time'].format(context)}',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
+                                        // Create a cart item with appointment metadata
+                                        final appointmentItem = CartItem(
+                                          id: 'appt_${DateTime.now().millisecondsSinceEpoch}',
+                                          item: widget.product,
+                                          quantity: 1,
+                                          addedAt: DateTime.now(),
+                                          metadata: data,
+                                        );
+
+                                        final cart = Cart(
+                                          userId: 'user_current',
+                                          items: [appointmentItem],
+                                          createdAt: DateTime.now(),
+                                          updatedAt: DateTime.now(),
+                                        );
+
+                                        Navigator.of(context).pushNamed(
+                                          '/payment',
+                                          arguments: cart,
                                         );
                                       },
                                     ),
