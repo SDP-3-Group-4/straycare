@@ -3,6 +3,7 @@ import '../models/chat_model.dart';
 import '../services/chat_service.dart';
 import 'chat_detail_screen.dart';
 import '../../../l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -177,12 +178,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 );
                               },
                             )
-                          : Image.network(
-                              chat.profileImageUrl,
+                          : CachedNetworkImage(
+                              imageUrl: chat.profileImageUrl,
                               width: 56,
                               height: 56,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
+                              errorWidget: (context, url, error) {
                                 return Container(
                                   width: 56,
                                   height: 56,

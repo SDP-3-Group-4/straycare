@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../features/profile/repositories/user_repository.dart';
 
 /// AuthService handles all authentication‑related operations.
 ///
@@ -25,6 +27,37 @@ class AuthService {
   // ---------------------------------------------------------------------
   // Google Sign‑In helper – uses a clientId on the web.
   // ---------------------------------------------------------------------
+  Future<void> setPersistence(bool isLocal) async {
+    try {
+      if (kIsWeb) {
+        await _auth.setPersistence(
+          isLocal ? Persistence.LOCAL : Persistence.SESSION,
+        );
+      } else {
+        // On mobile, session persistence isn't directly supported in the same way
+        // as web for "closing the app". FirebaseAuth mobile SDKs persist by default.
+        // However, we can simulate "SESSION" by not auto-logging in if a flag is set,
+        // or just rely on the user explicitly logging out.
+        //
+        // Note: The FlutterFire plugin documentation states setPersistence is web only
+        // for "Session" vs "Local". On mobile it is always "Local".
+        // To support "Don't Remember Me" on mobile, we would typically need to
+        // sign out the user when the app lifecycle state changes (closes).
+        //
+        // For this implementation, we will apply it where supported (Web) and
+        // for mobile we might need a different strategy if strict "session" is needed.
+        // But the user request implies they want "Remember Me" to *enable* persistence
+        // so we can assume the default is persistent, and "unchecked" might need
+        // explicit handling.
+        //
+        // Actually, a better approach for mobile "Don't remember me" is to simple
+        // not restore the session in main.dart if a local preference says so.
+      }
+    } catch (e) {
+      print("Error setting persistence: $e");
+    }
+  }
+
   GoogleSignIn _getGoogleSignIn() {
     if (kIsWeb) {
       return GoogleSignIn(
@@ -58,6 +91,18 @@ class AuthService {
       if (displayName != null && displayName.isNotEmpty) {
         await cred.user?.updateDisplayName(displayName.trim());
       }
+
+      // Save user to Firestore
+      if (cred.user != null) {
+        await UserRepository().saveUser(cred.user!.uid, {
+          'email': email.trim(),
+          'displayName': displayName ?? 'User',
+          'photoUrl': '',
+          'bio': 'No bio available',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       return cred;
     } on FirebaseAuthException {
       rethrow;
@@ -69,10 +114,20 @@ class AuthService {
     required String password,
   }) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
+
+      // Sync user data to ensure valid profile and verifiedStatus
+      if (userCredential.user != null) {
+        await UserRepository().saveUser(userCredential.user!.uid, {
+          'email': email.trim(),
+          'lastLogin': FieldValue.serverTimestamp(),
+        });
+      }
+
+      return userCredential;
     } on FirebaseAuthException {
       rethrow;
     }
@@ -116,6 +171,34 @@ class AuthService {
       if (googleUser.photoUrl != null) {
         await userCredential.user?.updatePhotoURL(googleUser.photoUrl!);
         print('Updated photo URL: ${googleUser.photoUrl}');
+      }
+
+      // Save user to Firestore
+      if (userCredential.user != null) {
+        final userDoc = await UserRepository().getUser(
+          userCredential.user!.uid,
+        );
+
+        if (!userDoc.exists) {
+          // New user: Create with default bio
+          await UserRepository().saveUser(userCredential.user!.uid, {
+            'email': googleUser.email,
+            'displayName': googleUser.displayName ?? 'User',
+            'photoUrl': googleUser.photoUrl ?? '',
+            'bio': 'No bio available',
+            'lastLogin': FieldValue.serverTimestamp(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Existing user: Update only necessary fields, preserve bio
+          // Use saveUser to ensure verifiedStatus checks are applied
+          await UserRepository().saveUser(userCredential.user!.uid, {
+            'email': googleUser.email,
+            'displayName': googleUser.displayName ?? 'User',
+            'photoUrl': googleUser.photoUrl ?? '',
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        }
       }
 
       return userCredential;

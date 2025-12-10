@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../marketplace/services/marketplace_service.dart';
 import '../../marketplace/models/marketplace_model.dart';
 import '../../marketplace/models/marketplace_category.dart';
 import '../../../l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({Key? key}) : super(key: key);
@@ -20,92 +25,17 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   Future<List<Order>> _fetchOrders() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-    return _generateMockOrders();
-  }
-
-  List<Order> _generateMockOrders() {
-    return [
-      Order(
-        id: 'ORD-2024-001',
-        userId: 'user_1',
-        items: [
-          CartItem(
-            id: 'cart_1',
-            item: MarketplaceItem(
-              id: 'item_1',
-              title: 'Premium Dog Food',
-              description: 'High quality food for dogs',
-              price: 1200.0,
-              currency: 'BDT',
-              imageUrl:
-                  'https://images.unsplash.com/photo-1589924691195-41432c84c161?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkb2clMjBmb29kfGVufDF8fHx8MTc2NDU0MDYzMHww&ixlib=rb-4.1.0&q=80&w=1080',
-              seller: 'Pet Shop BD',
-              category: MarketplaceCategory.foodAndNutrition,
-              rating: 4.5,
-              reviews: 10,
-              inStock: true,
-              stockCount: 50,
-              features: [],
-              deliveryTime: '2-3 days',
-            ),
-            quantity: 2,
-            addedAt: DateTime.now().subtract(const Duration(days: 5)),
-          ),
-        ],
-        subtotal: 2400.0,
-        tax: 120.0,
-        total: 2520.0,
-        status: OrderStatus.delivered,
-        paymentMethod: PaymentMethod.cashOnDelivery,
-        shippingAddress: '123 Main St, Dhaka',
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-        completedAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      Order(
-        id: 'ORD-2024-002',
-        userId: 'user_1',
-        items: [
-          CartItem(
-            id: 'cart_2',
-            item: MarketplaceItem(
-              id: 'item_2',
-              title: 'Vet Consultation',
-              description: 'General checkup',
-              price: 500.0,
-              currency: 'BDT',
-              imageUrl:
-                  'https://images.unsplash.com/photo-1628009368231-76033527212e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2ZXRlcmluYXJpYW58ZW58MXx8fHwxNzY0NTQwNjMwfDA&ixlib=rb-4.1.0&q=80&w=1080',
-              seller: 'Dr. Smith',
-              category: MarketplaceCategory.healthcare,
-              rating: 5.0,
-              reviews: 5,
-              inStock: true,
-              stockCount: 1,
-              features: [],
-              deliveryTime: 'N/A',
-              location: 'Gulshan 2, Dhaka',
-            ),
-            quantity: 1,
-            addedAt: DateTime.now().subtract(const Duration(days: 1)),
-            metadata: {
-              'date': DateTime.now().add(const Duration(days: 2)),
-              'time': const TimeOfDay(hour: 10, minute: 0),
-              'petName': 'Buddy',
-              'petType': 'Dog',
-            },
-          ),
-        ],
-        subtotal: 500.0,
-        tax: 0.0,
-        total: 500.0,
-        status: OrderStatus.confirmed,
-        paymentMethod: PaymentMethod.mobileMoney,
-        shippingAddress: 'N/A',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ];
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final service = Provider.of<MarketplaceService>(context, listen: false);
+        return await service.getOrderHistory();
+      } catch (e) {
+        debugPrint('Error fetching orders: $e');
+        return [];
+      }
+    }
+    return [];
   }
 
   @override
@@ -175,6 +105,9 @@ class _OrderCardState extends State<OrderCard> {
   }
 
   String _formatDate(dynamic date) {
+    if (date is Timestamp) {
+      date = date.toDate();
+    }
     if (date is DateTime) {
       return '${date.day}/${date.month}/${date.year}';
     }
@@ -340,12 +273,12 @@ class _OrderCardState extends State<OrderCard> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    firstItem.imageUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: firstItem.imageUrl,
                     width: 60,
                     height: 60,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
+                    errorWidget: (context, url, error) => Container(
                       width: 60,
                       height: 60,
                       color: isDark ? Colors.grey[800] : Colors.grey[300],
@@ -437,44 +370,47 @@ class _OrderCardState extends State<OrderCard> {
             const SizedBox(height: 16),
 
             // Rating
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Rate Experience:',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
+            if (!isDonation) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Rate Experience:',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                Row(
-                  children: List.generate(5, (index) {
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _rating = index + 1.0;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'You rated this order ${index + 1} stars!',
+                  Row(
+                    children: List.generate(5, (index) {
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _rating = index + 1.0;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'You rated this order ${index + 1} stars!',
+                              ),
+                              duration: const Duration(seconds: 1),
                             ),
-                            duration: const Duration(seconds: 1),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                          child: Icon(
+                            index < _rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 28,
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                        child: Icon(
-                          index < _rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 28,
                         ),
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

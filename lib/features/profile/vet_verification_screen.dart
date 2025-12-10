@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:intl/intl.dart';
 
 class VetVerificationScreen extends StatefulWidget {
@@ -82,7 +85,39 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
     }
   }
 
-  void _submitForm() {
+  // TODO: Replace with your deployed Google Apps Script Web App URL
+  static const String _googleScriptUrl =
+      'https://script.google.com/macros/s/AKfycbzxyadLLXNg-5l_vsybh2gUSydlbjiI_AmE5szAkLEz-vrFKN_w7lf-QxbMd3zAn44anw/exec';
+
+  Future<String?> _fileToBase64(File? file) async {
+    if (file == null) return null;
+    try {
+      final bytes = await file.readAsBytes();
+      return base64Encode(bytes);
+    } catch (e) {
+      debugPrint('Error converting file to base64: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _platformFileToBase64(PlatformFile? file) async {
+    if (file == null) return null;
+    try {
+      if (file.bytes != null) {
+        return base64Encode(file.bytes!);
+      } else if (file.path != null) {
+        final ioFile = File(file.path!);
+        final bytes = await ioFile.readAsBytes();
+        return base64Encode(bytes);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error converting platform file to base64: $e');
+      return null;
+    }
+  }
+
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedDate == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -109,35 +144,82 @@ class _VetVerificationScreenState extends State<VetVerificationScreen> {
         _isSubmitting = true;
       });
 
-      // Simulate API call
-      Future.delayed(const Duration(seconds: 2), () {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('User not logged in')));
+          return;
+        }
+
+        // Convert files first
+        final String? imageBase64 = await _fileToBase64(_profileImage);
+        final String? docBase64 = await _platformFileToBase64(_documentFile);
+
+        final response = await http.post(
+          Uri.parse(_googleScriptUrl),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: jsonEncode(<String, dynamic>{
+            'name': _nameController.text,
+            'clinic': _clinicController.text,
+            'nid': _nidController.text,
+            'dob': _selectedDate!.toIso8601String(),
+            'userId': user.uid,
+            'email': user.email ?? 'No email',
+
+            // File Data
+            'imageName': 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            'imageMimeType': 'image/jpeg',
+            'imageData': imageBase64 ?? '',
+
+            'docName': _documentFile?.name ?? 'document.pdf',
+            'docMimeType': 'application/pdf',
+            'docData': docBase64 ?? '',
+          }),
+        );
+
         if (mounted) {
           setState(() {
             _isSubmitting = false;
           });
 
-          // Show success dialog
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Submission Received'),
-              content: const Text(
-                'Your verification request has been submitted successfully. We will review your documents and update your status shortly.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop(); // Close dialog
-                    Navigator.of(context).pop(); // Go back to profile
-                  },
-                  child: const Text('OK'),
+          if (response.statusCode == 200 || response.statusCode == 302) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Submission Received'),
+                content: const Text(
+                  'Your verification request and documents have been submitted successfully. We will review them shortly.',
                 ),
-              ],
-            ),
-          );
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop(); // Close dialog
+                      Navigator.of(context).pop(); // Go back to profile
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            throw Exception('Failed to submit: ${response.statusCode}');
+          }
         }
-      });
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+        }
+      }
     }
   }
 

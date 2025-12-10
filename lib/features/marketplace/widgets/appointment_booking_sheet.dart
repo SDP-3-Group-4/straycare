@@ -428,7 +428,7 @@ class _AppointmentBookingSheetState extends State<AppointmentBookingSheet> {
                         !_showTimeError) {
                       final bookingData = {
                         'date': _selectedDate,
-                        'time': _selectedTime,
+                        'time': _selectedTime?.format(context),
                         'appointmentType': isVet
                             ? _appointmentType
                             : 'Physical',

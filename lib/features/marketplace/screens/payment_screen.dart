@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:straycare_demo/features/marketplace/models/marketplace_category.dart';
 import '../models/marketplace_model.dart';
 import '../services/marketplace_service.dart';
+import '../../create_post/repositories/post_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PaymentScreen extends StatefulWidget {
   final Cart cart;
@@ -69,7 +71,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       print('DEBUG: Creating order...');
       // Simulate Payment Gateway
       if (_selectedMethod != PaymentMethod.cashOnDelivery) {
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 15));
       }
 
       final order = await widget.service.createOrder(
@@ -80,6 +82,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
         fromCart: widget.cart,
       );
       print('DEBUG: Order created: ${order.id}');
+
+      // Handle Fundraiser Donation
+      if (_isDonationOnly()) {
+        final item = widget.cart.items.first;
+        if (item.metadata != null && item.metadata!.containsKey('postId')) {
+          final postId = item.metadata!['postId'] as String;
+          // Use defaults if keys missing to avoid crash, though they should be there
+          final postOwnerId =
+              item.metadata!['postOwnerId'] as String? ?? 'unknown';
+          final postTitle =
+              item.metadata!['postTitle'] as String? ?? 'Fundraiser';
+
+          final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+
+          await PostRepository().donate(
+            postId,
+            item.item.price,
+            userId,
+            postOwnerId,
+            postTitle,
+          );
+          print('DEBUG: Donation recorded for post $postId');
+        }
+      }
 
       if (mounted) {
         print('DEBUG: Showing success dialog');
@@ -194,10 +220,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                               ),
                             ],
                           ),
-                          if (item.metadata != null) ...[
+                          if (item.metadata != null &&
+                              item.metadata!.containsKey('date')) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Date: ${(item.metadata!['date'] as DateTime).day}/${(item.metadata!['date'] as DateTime).month}/${(item.metadata!['date'] as DateTime).year} - Time: ${(item.metadata!['time'] as TimeOfDay).format(context)}',
+                              'Date: ${(item.metadata!['date'] as DateTime).day}/${(item.metadata!['date'] as DateTime).month}/${(item.metadata!['date'] as DateTime).year} - Time: ${item.metadata!['time'] is TimeOfDay ? (item.metadata!['time'] as TimeOfDay).format(context) : item.metadata!['time']}',
                               style: theme.textTheme.bodySmall,
                             ),
                             Text(

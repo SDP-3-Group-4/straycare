@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this line
 import 'package:provider/provider.dart';
 import 'features/settings/providers/settings_provider.dart';
+import 'features/home/providers/home_provider.dart';
 import 'firebase_options.dart';
 
-// Import the screen files
 import 'features/auth/login_screen.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/marketplace/marketplace_screen.dart';
 import 'features/marketplace/screens/payment_screen.dart';
-import 'features/marketplace/services/marketplace_service.dart'
-    show LocalMarketplaceService;
-import 'features/ai_bot/screens/chat_list_screen.dart';
+import 'features/marketplace/services/marketplace_service.dart';
+import 'features/chat/screens/chat_list_screen.dart';
 import 'features/profile/profile_screen.dart';
-import 'package:straycare_demo/features/marketplace/models/marketplace_model.dart'
-    show Cart;
-// Note: enums.dart is imported within home_screen.dart where it's needed
+import 'features/marketplace/models/marketplace_model.dart';
+import 'features/marketplace/providers/marketplace_provider.dart';
 
 import 'l10n/app_localizations.dart';
+import 'features/chat/repositories/chat_repository.dart';
+import 'services/auth_service.dart';
 
 // --- MAIN FUNCTION ---
 void main() async {
@@ -40,7 +41,14 @@ class StrayCareDemoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => SettingsProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider(create: (_) => MarketplaceProvider()),
+        Provider<MarketplaceService>(
+          create: (_) => FirestoreMarketplaceService(),
+        ),
+      ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return MaterialApp(
@@ -154,7 +162,7 @@ class StrayCareDemoApp extends StatelessWidget {
                 bodyMedium: TextStyle(color: Colors.white70),
               ),
             ),
-            home: const LoginScreen(),
+            home: const AuthWrapper(),
             debugShowCheckedModeBanner: false,
             routes: {
               '/login': (context) => const LoginScreen(),
@@ -168,7 +176,10 @@ class StrayCareDemoApp extends StatelessWidget {
                   return MaterialPageRoute(
                     builder: (context) => PaymentScreen(
                       cart: args,
-                      service: LocalMarketplaceService(),
+                      service: Provider.of<MarketplaceService>(
+                        context,
+                        listen: false,
+                      ),
                     ),
                   );
                 }
@@ -227,8 +238,84 @@ class _MainAppShellState extends State<MainAppShell> {
             label: AppLocalizations.of(context).translate('marketplace'),
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_bubble_outline),
-            activeIcon: const Icon(Icons.chat_bubble),
+            icon: StreamBuilder<int>(
+              stream: ChatRepository().getTotalUnreadCountStream(
+                AuthService().currentUser?.uid ?? '',
+              ),
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                return Stack(
+                  children: [
+                    const Icon(Icons.chat_bubble_outline),
+                    if (count > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Center(
+                            child: Text(
+                              count > 99 ? '99+' : '$count',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            activeIcon: StreamBuilder<int>(
+              stream: ChatRepository().getTotalUnreadCountStream(
+                AuthService().currentUser?.uid ?? '',
+              ),
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                return Stack(
+                  children: [
+                    const Icon(Icons.chat_bubble),
+                    if (count > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             label: AppLocalizations.of(context).translate('ai_bot'),
           ),
           BottomNavigationBarItem(
@@ -238,6 +325,29 @@ class _MainAppShellState extends State<MainAppShell> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// --- AUTH WRAPPER ---
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasData) {
+          return const MainAppShell();
+        }
+        return const LoginScreen();
+      },
     );
   }
 }

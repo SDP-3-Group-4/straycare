@@ -31,13 +31,15 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
 
       try {
+        await _authService.setPersistence(_rememberMe);
         await _authService.signInWithEmail(
           email: _emailController.text,
           password: _passwordController.text,
         );
 
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed('/home');
+        // Navigation is handled by AuthWrapper stream in main.dart
+        // But we can pop here if we pushed validly, or let the stream rebuild main.
+        // Since we replaced 'home' with AuthWrapper, the stream update will switch the widget.
       } on FirebaseAuthException catch (e) {
         if (!mounted) return;
         String errorMessage = 'Login failed. Please try again.';
@@ -71,10 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleGoogleLogin() async {
     setState(() => _isLoading = true);
     try {
+      await _authService.setPersistence(_rememberMe);
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed('/home');
+        // Navigation handled by AuthWrapper
       }
     } catch (e) {
       if (!mounted) return;

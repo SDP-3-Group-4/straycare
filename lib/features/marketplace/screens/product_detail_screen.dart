@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:straycare_demo/features/marketplace/models/marketplace_category.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/marketplace_model.dart';
-import '../services/marketplace_service.dart';
+import '../repositories/marketplace_repository.dart';
+import '../../../../services/auth_service.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../widgets/appointment_booking_sheet.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final MarketplaceItem product;
-  final MarketplaceService service;
+  final MarketplaceRepository repository;
   final Function(int)? onAddToCart;
 
   const ProductDetailScreen({
     Key? key,
     required this.product,
-    required this.service,
+    required this.repository,
     this.onAddToCart,
   }) : super(key: key);
 
@@ -87,10 +89,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               width: double.infinity,
               height: 300,
               decoration: const BoxDecoration(color: Colors.grey),
-              child: Image.network(
-                widget.product.imageUrl,
+              child: CachedNetworkImage(
+                imageUrl: widget.product.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
+                errorWidget: (context, url, error) {
                   return Container(
                     color: Colors.grey.shade300,
                     child: Center(
@@ -493,9 +495,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 } else {
                                   setState(() => _isAddingToCart = true);
                                   try {
-                                    await widget.service.addToCart(
-                                      widget.product.id,
-                                      _quantity,
+                                    final user = AuthService().currentUser;
+                                    if (user == null) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            AppLocalizations.of(
+                                              context,
+                                            ).translate('login_required'),
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final cartItem = CartItem(
+                                      id: '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}',
+                                      item: widget.product,
+                                      quantity: _quantity,
+                                      addedAt: DateTime.now(),
+                                    );
+
+                                    await widget.repository.addToCart(
+                                      user.uid,
+                                      cartItem,
                                     );
                                     if (mounted) {
                                       widget.onAddToCart?.call(_quantity);

@@ -1,30 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:straycare_demo/features/marketplace/models/marketplace_category.dart';
-import 'models/marketplace_model.dart';
-import 'services/marketplace_service.dart';
+import 'package:straycare_demo/features/marketplace/models/marketplace_model.dart';
+import 'package:straycare_demo/features/marketplace/providers/marketplace_provider.dart';
+import 'package:straycare_demo/features/marketplace/repositories/marketplace_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/cart_screen.dart';
+import '../../services/auth_service.dart';
 import '../../l10n/app_localizations.dart';
 
-class MarketplaceScreen extends StatefulWidget {
+class MarketplaceScreen extends StatelessWidget {
   const MarketplaceScreen({super.key});
 
   @override
-  State<MarketplaceScreen> createState() => _MarketplaceScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => MarketplaceProvider(),
+      child: const _MarketplaceScreenContent(),
+    );
+  }
 }
 
-class _MarketplaceScreenState extends State<MarketplaceScreen> {
-  final MarketplaceService _service = LocalMarketplaceService();
-  late Future<List<MarketplaceItem>> _itemsFuture;
-  MarketplaceCategory? _selectedCategory;
-  String _searchQuery = '';
+class _MarketplaceScreenContent extends StatefulWidget {
+  const _MarketplaceScreenContent();
 
+  @override
+  State<_MarketplaceScreenContent> createState() =>
+      _MarketplaceScreenContentState();
+}
+
+class _MarketplaceScreenContentState extends State<_MarketplaceScreenContent> {
   final ScrollController _scrollController = ScrollController();
+  final MarketplaceRepository _repository =
+      MarketplaceRepository(); // Keep for navigation
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _itemsFuture = _service.getAllItems();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -33,16 +49,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.dispose();
   }
 
-  void _filterItems() {
-    setState(() {
-      if (_searchQuery.isNotEmpty) {
-        _itemsFuture = _service.searchItems(_searchQuery);
-      } else if (_selectedCategory != null) {
-        _itemsFuture = _service.getItemsByCategory(_selectedCategory!);
-      } else {
-        _itemsFuture = _service.getAllItems();
-      }
-    });
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<MarketplaceProvider>().loadMoreItems();
+    }
   }
 
   @override
@@ -56,17 +67,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               pinned: true,
               delegate: _MarketplaceHeaderDelegate(
                 topPadding: MediaQuery.of(context).padding.top,
-                service: _service,
-                selectedCategory: _selectedCategory,
+                repository: _repository,
+                selectedCategory: context
+                    .watch<MarketplaceProvider>()
+                    .selectedCategory,
                 onSearchChanged: (value) {
-                  _searchQuery = value;
-                  _filterItems();
+                  setState(() {
+                    _searchQuery = value;
+                  });
                 },
                 onCategorySelected: (category) {
-                  setState(() {
-                    _selectedCategory = category;
-                    _filterItems();
-                  });
+                  context.read<MarketplaceProvider>().setCategory(
+                    category ?? 'All',
+                  );
                   if (_scrollController.hasClients) {
                     _scrollController.animateTo(
                       0,
@@ -79,22 +92,44 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             ),
           ];
         },
-        body: FutureBuilder<List<MarketplaceItem>>(
-          future: _itemsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+        body: Consumer<MarketplaceProvider>(
+          builder: (context, provider, child) {
+            if (provider.items.isEmpty && provider.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  '${AppLocalizations.of(context).translate('error')}: ${snapshot.error}',
-                ),
-              );
+            var items = provider.items.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              data['id'] = doc.id;
+              return MarketplaceItem.fromJson(data);
+            }).toList();
+
+            // Client-side filtering for search (Category is handled by provider somewhat, but let's enforce)
+            if (provider.selectedCategory != 'All') {
+              // Provider fetches all for now, so we filter here if needed,
+              // OR provider handles it. My provider implementation fetches all.
+              // So I should filter here.
+              // Actually, provider logic was "fetch all".
+              // To be consistent with "Industry Standard", filtering should be server-side.
+              // But for now, let's filter client side as per previous implementation to keep it working.
+              // Wait, previous implementation filtered client side.
+              items = items
+                  .where(
+                    (item) =>
+                        item.category.name == provider.selectedCategory ||
+                        provider.selectedCategory == 'All',
+                  )
+                  .toList();
             }
 
-            final items = snapshot.data ?? [];
+            if (_searchQuery.isNotEmpty) {
+              final query = _searchQuery.toLowerCase();
+              items = items.where((item) {
+                return item.title.toLowerCase().contains(query) ||
+                    item.description.toLowerCase().contains(query) ||
+                    item.seller.toLowerCase().contains(query);
+              }).toList();
+            }
 
             if (items.isEmpty) {
               return Center(
@@ -104,36 +139,41 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               );
             }
 
-            return GridView.count(
-              crossAxisCount: 2,
+            return GridView.builder(
               padding: const EdgeInsets.all(8.0),
-              childAspectRatio: 0.8,
-              mainAxisSpacing: 8.0,
-              crossAxisSpacing: 8.0,
-              children: items
-                  .map(
-                    (item) => GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ProductDetailScreen(
-                              product: item,
-                              service: _service,
-                            ),
-                          ),
-                        );
-                      },
-                      child: MarketItemCard(
-                        title: item.title,
-                        price: 'BDT ${item.price.toStringAsFixed(0)}',
-                        imageUrl: item.imageUrl,
-                        seller: item.seller,
-                        rating: item.rating,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.8,
+                mainAxisSpacing: 8.0,
+                crossAxisSpacing: 8.0,
+              ),
+              itemCount: items.length + (provider.hasMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == items.length) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final item = items[index];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProductDetailScreen(
+                          product: item,
+                          repository: _repository,
+                        ),
                       ),
-                    ),
-                  )
-                  .toList(),
+                    );
+                  },
+                  child: MarketItemCard(
+                    title: item.title,
+                    price: 'BDT ${item.price.toStringAsFixed(0)}',
+                    imageUrl: item.imageUrl,
+                    seller: item.seller,
+                    rating: item.rating,
+                  ),
+                );
+              },
             );
           },
         ),
@@ -180,15 +220,17 @@ class MarketItemCard extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                Image.network(
-                  imageUrl,
+                CachedNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Icon(Icons.pets, color: Colors.grey.shade600),
-                    );
-                  },
+                  height: 100,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  errorWidget: (context, url, error) => Center(
+                    child: Icon(Icons.pets, color: Colors.grey.shade600),
+                  ),
                 ),
                 Positioned(
                   top: 4,
@@ -281,14 +323,14 @@ class MarketItemCard extends StatelessWidget {
 
 class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
-  final MarketplaceService service;
-  final MarketplaceCategory? selectedCategory;
+  final MarketplaceRepository repository;
+  final String? selectedCategory;
   final ValueChanged<String> onSearchChanged;
-  final ValueChanged<MarketplaceCategory?> onCategorySelected;
+  final ValueChanged<String?> onCategorySelected;
 
   _MarketplaceHeaderDelegate({
     required this.topPadding,
-    required this.service,
+    required this.repository,
     required this.selectedCategory,
     required this.onSearchChanged,
     required this.onCategorySelected,
@@ -348,64 +390,79 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        IconButton(
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    CartScreen(service: service),
-                              ),
-                            );
-                            // Refresh cart count when returning
-                            if (context.mounted) {
-                              (context as Element).markNeedsBuild();
-                            }
-                          },
-                          icon: Icon(
-                            Icons.shopping_cart,
-                            size: 28, // Increased size
-                            color:
-                                theme.appBarTheme.iconTheme?.color ??
-                                theme.iconTheme.color,
+                        StreamBuilder<DocumentSnapshot>(
+                          stream: repository.getCartStream(
+                            AuthService().currentUser?.uid ?? '',
                           ),
-                        ),
-                        FutureBuilder<Cart>(
-                          future: service.getCart(),
                           builder: (context, snapshot) {
-                            if (!snapshot.hasData ||
-                                snapshot.data!.items.isEmpty) {
-                              return const SizedBox.shrink();
+                            int itemCount = 0;
+                            if (snapshot.hasData &&
+                                snapshot.data!.exists &&
+                                snapshot.data!.data() != null) {
+                              try {
+                                final data =
+                                    snapshot.data!.data()
+                                        as Map<String, dynamic>;
+                                // Simple parsing to avoid importing Cart model if not needed,
+                                // but we imported MarketplaceModel so we can use Cart.fromJson
+                                final cart = Cart.fromJson(data);
+                                itemCount = cart.itemCount;
+                              } catch (e) {
+                                print('Error parsing cart count: $e');
+                              }
                             }
 
-                            final itemCount = snapshot.data!.items.fold<int>(
-                              0,
-                              (sum, item) => sum + item.quantity,
-                            );
-
-                            return Positioned(
-                              right: 4, // Adjusted position
-                              top: 4, // Adjusted position
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 18, // Slightly larger badge
-                                  minHeight: 18,
-                                ),
-                                child: Text(
-                                  '$itemCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11, // Slightly larger text
-                                    fontWeight: FontWeight.bold,
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            CartScreen(repository: repository),
+                                      ),
+                                    );
+                                    // Refresh cart count when returning
+                                    if (context.mounted) {
+                                      (context as Element).markNeedsBuild();
+                                    }
+                                  },
+                                  icon: Icon(
+                                    Icons.shopping_cart,
+                                    size: 28,
+                                    color:
+                                        theme.appBarTheme.iconTheme?.color ??
+                                        theme.iconTheme.color,
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
-                              ),
+                                if (itemCount > 0)
+                                  Positioned(
+                                    right: 4,
+                                    top: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                        minHeight: 16,
+                                      ),
+                                      child: Text(
+                                        itemCount.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             );
                           },
                         ),
@@ -465,9 +522,9 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                             AppLocalizations.of(context).translate('all'),
                           ),
                           labelStyle: const TextStyle(fontSize: 12),
-                          selected: selectedCategory == null,
+                          selected: selectedCategory == 'All',
                           onSelected: (selected) {
-                            onCategorySelected(null);
+                            onCategorySelected('All');
                           },
                           shape: const StadiumBorder(),
                           visualDensity: VisualDensity.compact,
@@ -485,9 +542,13 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                               _getCategoryDisplayName(context, category),
                             ),
                             labelStyle: const TextStyle(fontSize: 12),
-                            selected: selectedCategory == category,
+                            selected:
+                                selectedCategory ==
+                                category.name, // Simple comparison
                             onSelected: (selected) {
-                              onCategorySelected(selected ? category : null);
+                              onCategorySelected(
+                                selected ? category.name : null,
+                              );
                             },
                             shape: const StadiumBorder(),
                             visualDensity: VisualDensity.compact,
@@ -514,7 +575,7 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_MarketplaceHeaderDelegate oldDelegate) {
     return topPadding != oldDelegate.topPadding ||
         selectedCategory != oldDelegate.selectedCategory ||
-        service != oldDelegate.service;
+        repository != oldDelegate.repository;
   }
 
   String _getCategoryDisplayName(

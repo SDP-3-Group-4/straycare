@@ -2,7 +2,7 @@ name: straycare_demo
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+4
+version: 2.0.0+13
 
 environment:
   sdk: ^3.9.2
@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^3.1.1
   firebase_auth: ^5.1.1
+  cloud_firestore: ^5.0.1
   google_sign_in: ^6.2.0
   image_picker: ^1.1.2
   file_picker: ^8.0.0
@@ -50,8 +51,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
-
-
+  cached_network_image: ^3.3.1
+  firebase_storage: ^12.4.10
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -63,20 +65,19 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+  fake_cloud_firestore: ^3.1.0
 # Add this new section at the end of the file
 flutter_launcher_icons:
-  android: "launcher_icon"   # Keep this as is
-  ios: true                  # Generate iOS icons too
+  android: "launcher_icon" # Keep this as is
+  ios: true # Generate iOS icons too
   image_path: "assets/icon/app_icon.png" # Path to YOUR icon file
-  min_sdk_android: 21        # Keep this as is (minimum Android version)
-
+  min_sdk_android: 21 # Keep this as is (minimum Android version)
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -120,3 +121,4 @@ flutter:
 
 dependency_overrides:
   google_api_headers: ^5.0.1
+  rxdart: ^0.28.0

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../shared/enums.dart';
-import '../../home/home_screen.dart';
+import '../../home/widgets/post_card.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../create_post/repositories/post_repository.dart';
+import '../../profile/repositories/user_repository.dart';
+import '../../../services/auth_service.dart';
 
 class SavedPostsScreen extends StatefulWidget {
   const SavedPostsScreen({Key? key}) : super(key: key);
@@ -11,44 +15,71 @@ class SavedPostsScreen extends StatefulWidget {
 }
 
 class _SavedPostsScreenState extends State<SavedPostsScreen> {
-  // Mock Data for Saved Posts
-  final List<Map<String, dynamic>> _savedPosts = [
-    {
-      'userName': 'Sabrina Tasnim Imu',
-      'userAvatarUrl': 'https://picsum.photos/seed/sabrina/100/100',
-      'timeAgo': '2d ago',
-      'location': 'Near BUBT Campus, Dhaka',
-      'category': PostCategory.rescue,
-      'postContent':
-          'Found an injured dog near BUBT campus. Needs immediate help! It seems to have a broken leg.',
-      'postImageUrl': 'https://picsum.photos/seed/dog/600/400',
-      'likes': 15,
-      'comments': 3,
-    },
-    {
-      'userName': 'Arpita Biswas',
-      'userAvatarUrl': 'https://picsum.photos/seed/arpita/100/100',
-      'timeAgo': '1w ago',
-      'location': 'Dhaka',
-      'category': PostCategory.fundraise,
-      'postContent':
-          'Raising funds for "Happy Paws" shelter. We need to buy food and medicine for 50+ rescued animals for the winter.',
-      'postImageUrl': 'https://picsum.photos/seed/shelter/600/400',
-      'likes': 120,
-      'comments': 15,
-      'raisedAmount': 4200.0,
-      'goalAmount': 10000.0,
-      'donorCount': 124,
-    },
-  ];
+  final PostRepository _postRepository = PostRepository();
+  final UserRepository _userRepository = UserRepository();
+  final AuthService _authService = AuthService();
 
-  void _handleRemove(int index) {
-    setState(() {
-      _savedPosts.removeAt(index);
-    });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Removed from saved items')));
+  List<DocumentSnapshot> _savedPosts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSavedPosts();
+  }
+
+  Future<void> _fetchSavedPosts() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      // Get user doc to get saved IDs
+      final userDoc = await _userRepository.getUser(user.uid);
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        final savedIds = List<String>.from(data['savedPostIds'] ?? []);
+
+        if (savedIds.isNotEmpty) {
+          final posts = await _postRepository.getPostsByIds(savedIds);
+          setState(() {
+            _savedPosts = posts;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _savedPosts = [];
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Error fetching saved posts: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleRemove(String postId) async {
+    final user = _authService.currentUser;
+    if (user == null) return;
+
+    try {
+      await _userRepository.unsavePost(user.uid, postId);
+      setState(() {
+        _savedPosts.removeWhere((doc) => doc.id == postId);
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Removed from saved items')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error removing post: $e')));
+    }
   }
 
   @override
@@ -60,7 +91,9 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
         title: Text(AppLocalizations.of(context).translate('saved_items')),
         centerTitle: true,
       ),
-      body: _savedPosts.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _savedPosts.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -84,22 +117,62 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
               itemCount: _savedPosts.length,
               itemBuilder: (context, index) {
                 final post = _savedPosts[index];
+                final data = post.data() as Map<String, dynamic>;
+
+                // Parse category
+                PostCategory category = PostCategory.rescue;
+                try {
+                  category = PostCategory.values.firstWhere(
+                    (e) => e.name == data['category'],
+                    orElse: () => PostCategory.rescue,
+                  );
+                } catch (_) {}
+
+                // Calculate time ago
+                String timeAgo = 'Just now';
+                if (data['createdAt'] != null) {
+                  final date = (data['createdAt'] as Timestamp).toDate();
+                  final diff = DateTime.now().difference(date);
+                  if (diff.inMinutes < 60) {
+                    timeAgo = '${diff.inMinutes}m ago';
+                  } else if (diff.inHours < 24) {
+                    timeAgo = '${diff.inHours}h ago';
+                  } else {
+                    timeAgo = '${diff.inDays}d ago';
+                  }
+                }
+
+                final currentUser = _authService.currentUser;
+                final isLiked =
+                    (data['likes'] as List?)?.contains(currentUser?.uid) ??
+                    false;
+
                 return PostCard(
-                  key: ValueKey(post['postContent']),
-                  userName: post['userName'],
-                  userAvatarUrl: post['userAvatarUrl'],
-                  timeAgo: post['timeAgo'],
-                  location: post['location'],
-                  category: post['category'],
-                  postContent: post['postContent'],
-                  postImageUrl: post['postImageUrl'],
-                  likes: post['likes'],
-                  comments: post['comments'],
-                  raisedAmount: post['raisedAmount'],
-                  goalAmount: post['goalAmount'],
-                  donorCount: post['donorCount'],
+                  postId: post.id,
+                  userId: data['authorId'] ?? '',
+                  userName: data['authorName'] ?? 'Anonymous',
+                  userAvatarUrl: data['authorPhotoUrl'] ?? '',
+                  timeAgo: timeAgo,
+                  location: data['location'] ?? '',
+                  category: category,
+                  postContent: data['content'] ?? '',
+                  postImageUrl: data['imageUrl'] ?? '',
+                  likes: (data['likes'] as List?)?.length ?? 0,
+                  comments: data['commentsCount'] ?? 0,
+                  raisedAmount: (data['currentAmount'] as num?)?.toDouble(),
+                  goalAmount: (data['fundraiseGoal'] as num?)?.toDouble(),
+                  donorCount: 0,
+                  isLiked: isLiked,
                   isSaved: true,
-                  onSave: () => _handleRemove(index),
+                  onSave: () => _handleRemove(post.id),
+                  onLike: () {
+                    final repo = PostRepository();
+                    if (isLiked) {
+                      repo.unlikePost(post.id);
+                    } else {
+                      repo.likePost(post.id);
+                    }
+                  },
                 );
               },
             ),

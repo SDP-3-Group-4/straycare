@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:straycare_demo/features/marketplace/models/marketplace_category.dart';
 import '../models/marketplace_model.dart';
-import '../services/marketplace_service.dart';
+import '../repositories/marketplace_repository.dart';
+import '../../../../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CartScreen extends StatefulWidget {
-  final MarketplaceService service;
+  final MarketplaceRepository repository;
   final VoidCallback? onCheckout;
 
-  const CartScreen({Key? key, required this.service, this.onCheckout})
+  const CartScreen({Key? key, required this.repository, this.onCheckout})
     : super(key: key);
 
   @override
@@ -16,18 +19,13 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  late Future<Cart> _cartFuture;
+  final AuthService _authService = AuthService();
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _cartFuture = widget.service.getCart();
-  }
-
-  void _refreshCart() {
-    setState(() {
-      _cartFuture = widget.service.getCart();
-    });
+    _userId = _authService.getUserUid();
   }
 
   bool _isServiceCategory(MarketplaceCategory category) {
@@ -60,8 +58,10 @@ class _CartScreenState extends State<CartScreen> {
     final primaryColor = theme.primaryColor;
 
     return Scaffold(
-      body: FutureBuilder<Cart>(
-        future: _cartFuture,
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _userId != null
+            ? widget.repository.getCartStream(_userId!)
+            : const Stream.empty(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -75,13 +75,17 @@ class _CartScreenState extends State<CartScreen> {
             );
           }
 
-          if (!snapshot.hasData) {
-            return Center(
-              child: Text(AppLocalizations.of(context).translate('no_data')),
+          Cart cart;
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            cart = Cart(
+              userId: _userId ?? '',
+              items: [],
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
             );
+          } else {
+            cart = Cart.fromJson(snapshot.data!.data() as Map<String, dynamic>);
           }
-
-          final cart = snapshot.data!;
 
           if (cart.items.isEmpty) {
             return Center(
@@ -144,8 +148,12 @@ class _CartScreenState extends State<CartScreen> {
                       cartItem: cartItem,
                       isService: _isServiceCategory(cartItem.item.category),
                       onRemove: () async {
-                        await widget.service.removeFromCart(cartItem.item.id);
-                        _refreshCart();
+                        if (_userId != null) {
+                          await widget.repository.removeFromCart(
+                            _userId!,
+                            cartItem.item.id,
+                          );
+                        }
                       },
                     ),
                   );
@@ -155,13 +163,20 @@ class _CartScreenState extends State<CartScreen> {
           );
         },
       ),
-      bottomNavigationBar: FutureBuilder<Cart>(
-        future: _cartFuture,
+      bottomNavigationBar: StreamBuilder<DocumentSnapshot>(
+        stream: _userId != null
+            ? widget.repository.getCartStream(_userId!)
+            : const Stream.empty(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data!.items.isEmpty) {
+          if (!snapshot.hasData || !snapshot.data!.exists) {
             return const SizedBox.shrink();
           }
-          final cart = snapshot.data!;
+          final cart = Cart.fromJson(
+            snapshot.data!.data() as Map<String, dynamic>,
+          );
+          if (cart.items.isEmpty) {
+            return const SizedBox.shrink();
+          }
           return Container(
             decoration: BoxDecoration(
               border: Border(top: BorderSide(color: Colors.grey.shade200)),
@@ -293,10 +308,10 @@ class CartItemTile extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                item.imageUrl,
+              child: CachedNetworkImage(
+                imageUrl: item.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
+                errorWidget: (context, url, error) {
                   return Center(
                     child: Icon(Icons.pets, color: Colors.grey.shade600),
                   );

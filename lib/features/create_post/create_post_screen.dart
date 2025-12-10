@@ -10,6 +10,9 @@ import '../../shared/enums.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../l10n/app_localizations.dart';
+import 'repositories/post_repository.dart';
+import '../../services/auth_service.dart';
+import '../../services/cloudinary_service.dart';
 
 // Google Places API key is read from a compile-time define for safety.
 // Provide it when running the app with: --dart-define=GOOGLE_API_KEY=your_key
@@ -47,6 +50,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _bankAccountController = TextEditingController();
   final _bankNameController = TextEditingController();
   final _accountHolderController = TextEditingController();
+
+  late final PostRepository _postRepository;
+  final AuthService _authService = AuthService();
+  bool _isSubmitting = false;
 
   PostCategory? _selectedCategory;
 
@@ -126,6 +133,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   void initState() {
     super.initState();
+    _postRepository = PostRepository();
     _locationController.addListener(_onLocationChanged);
   }
 
@@ -371,7 +379,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
-  void _submitPost() {
+  Future<void> _submitPost() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategory == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -410,19 +418,80 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         }
       }
 
-      // Placeholder for post submission logic
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context).translate('post_created_success'),
+      final user = _authService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You must be logged in to create a post'),
           ),
-        ),
-      );
+        );
+        return;
+      }
 
-      // Navigate back after a short delay
-      Future.delayed(const Duration(seconds: 1), () {
-        Navigator.pop(context);
+      setState(() {
+        _isSubmitting = true;
       });
+
+      try {
+        String? imageUrl;
+        if (_image != null) {
+          final cloudinaryService = CloudinaryService();
+          imageUrl = await cloudinaryService.uploadImage(_image!);
+        }
+
+        final postData = {
+          'authorId': user.uid,
+          'authorName': user.displayName ?? 'Anonymous',
+          'authorPhotoUrl': user.photoURL,
+          'content': _contentController.text,
+          'category': _selectedCategory!.name, // Store enum name
+          'location': _locationController.text,
+          'latitude': _selectedLat,
+          'longitude': _selectedLon,
+          'likes': [],
+          'commentsCount': 0,
+          'imageUrl': imageUrl ?? '',
+        };
+
+        if (_selectedCategory == PostCategory.fundraise) {
+          postData['fundraiseGoal'] =
+              double.tryParse(_fundraiseGoalController.text) ?? 0.0;
+          postData['currentAmount'] = 0.0;
+          postData['paymentMethod'] = _selectedPaymentMethod;
+          if (_selectedPaymentMethod == 'bank_transfer') {
+            postData['bankDetails'] = {
+              'accountHolder': _accountHolderController.text,
+              'bankName': _bankNameController.text,
+              'accountNumber': _bankAccountController.text,
+            };
+          }
+        }
+
+        await _postRepository.createPost(postData);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).translate('post_created_success'),
+            ),
+          ),
+        );
+
+        Navigator.pop(context);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error creating post: $e')));
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+      }
     }
   }
 
@@ -513,13 +582,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   vertical: 8,
                 ), // Add some padding
               ),
-              child: Text(
-                AppLocalizations.of(context).translate('post'),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      AppLocalizations.of(context).translate('post'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],

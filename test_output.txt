@@ -1,0 +1,21 @@
+00:00 +0: loading F:/SW_Development/straycare_demo/test/features/create_post/repositories/post_repository_test.dart
+00:00 +0: createPost adds a post to Firestore
+Error in test: type 'FieldValue' is not a subtype of type 'String' of 'value'
+Stack trace: #0      _LinkedHashMapMixin.[]= (dart:_compact_hash:634:30)
+#1      PostRepository.createPost (package:straycare_demo/features/create_post/repositories/post_repository.dart:14:13)
+#2      main.<anonymous closure> (file:///F:/SW_Development/straycare_demo/test/features/create_post/repositories/post_repository_test.dart:25:43)
+#3      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:242:19)
+<asynchronous suspension>
+#4      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:240:7)
+<asynchronous suspension>
+#5      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:282:9)
+<asynchronous suspension>
+
+00:00 +0 -1: createPost adds a post to Firestore [E]
+  type 'FieldValue' is not a subtype of type 'String' of 'value'
+  dart:_compact_hash                                                                   _LinkedHashMapMixin.[]=
+  package:straycare_demo/features/create_post/repositories/post_repository.dart 14:13  PostRepository.createPost
+  test\features\create_post\repositories\post_repository_test.dart 25:43               main.<fn>
+  
+00:00 +0 -1: getPostsStream returns a stream of posts
+00:00 +1 -1: Some tests failed.
