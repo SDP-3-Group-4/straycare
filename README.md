@@ -53,7 +53,7 @@ This repository contains complete design and planning artifacts for the project:
 - Entity-Relationship Diagram (ERD)  
 - Sequence Diagrams  
 - Class Diagram  
-
+<a href="https://github.com/SDP-3-Group-4/straycare/wiki">Check it out here.</a>
 ---
 
 ## 🏁 Getting Started
