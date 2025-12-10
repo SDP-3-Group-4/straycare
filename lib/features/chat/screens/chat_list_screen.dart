@@ -7,7 +7,6 @@ import '../../ai_bot/models/chat_model.dart';
 import '../repositories/chat_repository.dart';
 import 'chat_detail_screen.dart';
 import 'user_search_screen.dart';
-import '../../ai_bot/ai_vet_bot_screen.dart';
 import '../../../l10n/app_localizations.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -199,7 +198,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const AiVetBotScreen()),
+          MaterialPageRoute(
+            builder: (context) => ChatDetailScreen(
+              chat: Chat(
+                id: 'anvil_1_beta_${_currentUserId}',
+                name: 'AI Vet Bot',
+                profileImageUrl: '',
+                lastMessage: 'Ask me anything about pet care!',
+                lastMessageTime: DateTime.now(),
+                isAiBot: true,
+                tag: 'Anvil 1 Beta',
+              ),
+            ),
+          ),
         );
       },
       child: Container(

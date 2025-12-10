@@ -78,7 +78,11 @@ class ChatRepository {
                     .get();
                 if (userDoc.exists) {
                   final userData = userDoc.data()!;
-                  chatName = userData['displayName'] ?? 'Unknown User';
+                  chatName = userData['displayName'] ?? 'StrayCare User';
+                  if (chatName == 'StrayCare User' &&
+                      userData['email'] != null) {
+                    chatName = (userData['email'] as String).split('@')[0];
+                  }
                   chatImage = userData['photoUrl'] ?? '';
                   if (userData['verifiedStatus'] == true ||
                       userData['email'] == 'shopnilmax@gmail.com') {

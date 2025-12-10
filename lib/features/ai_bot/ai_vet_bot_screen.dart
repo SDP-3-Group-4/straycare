@@ -1,77 +1,44 @@
 import 'package:flutter/material.dart';
+import '../chat/screens/chat_detail_screen.dart';
+import 'models/chat_model.dart';
 
 // --- SCREEN 3: AI VET BOT ---
-class AiVetBotScreen extends StatelessWidget {
+// --- SCREEN 3: AI VET BOT (REDIRECT) ---
+class AiVetBotScreen extends StatefulWidget {
   const AiVetBotScreen({Key? key}) : super(key: key);
 
   @override
+  State<AiVetBotScreen> createState() => _AiVetBotScreenState();
+}
+
+class _AiVetBotScreenState extends State<AiVetBotScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Auto-redirect to the real ChatDetailScreen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            chat: Chat(
+              id: 'anvil_1_beta',
+              name: 'AI Vet Bot',
+              profileImageUrl: '',
+              lastMessage: 'Ask me anything about pet care!',
+              lastMessageTime: DateTime.now(),
+              isAiBot: true,
+              tag: 'Anvil 1 Beta',
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('AI Vet Bot')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(10),
-              children: const [
-                ChatBubble(
-                  isMe: false,
-                  message:
-                      'Hello! I am the StrayCare AI Vet Bot. How can I assist you today?',
-                ),
-                ChatBubble(
-                  isMe: true,
-                  message: 'My dog just ate some chocolate. What should I do?',
-                ),
-                ChatBubble(
-                  isMe: false,
-                  message:
-                      '''Chocolate can be toxic to dogs. Observe your dog for symptoms like vomiting or hyperactivity. It is highly recommended to contact a professional veterinarian immediately for advice.\n\n---
-⚠️ *Disclaimer: I am an AI assistant, not a veterinarian. This advice is for preliminary guidance only. Please consult a professional for medical emergencies.*''',
-                ),
-              ],
-            ),
-          ),
-          // Input bar
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.3),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Type your question...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: () {},
-                  color: Theme.of(context).primaryColor,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 

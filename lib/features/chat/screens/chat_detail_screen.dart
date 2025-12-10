@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../ai_bot/models/chat_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../profile/repositories/user_repository.dart';
@@ -8,6 +9,7 @@ import '../repositories/chat_repository.dart';
 import 'chat_info_screen.dart';
 import '../../home/widgets/user_profile_dialog.dart';
 import 'package:straycare_demo/shared/widgets/verified_badge.dart';
+import '../../../../services/ai_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final Chat chat;
@@ -124,8 +126,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || _currentUserId == null)
+    if (_messageController.text.trim().isEmpty) return;
+
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send: You appear to be offline or logged out.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
+    }
 
     final content = _messageController.text.trim();
     _messageController.clear();
@@ -136,6 +147,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         content,
         _currentUserId!,
       );
+
+      // AI Bot Logic
+      if (widget.chat.isAiBot) {
+        // 1. Fake typing from bot
+        _chatRepository.setTypingStatus(widget.chat.id, 'anvil_1_beta', true);
+
+        // 2. Get response
+        final aiResponse = await AIService().getAnvilResponse(content);
+
+        // 3. Stop typing
+        _chatRepository.setTypingStatus(widget.chat.id, 'anvil_1_beta', false);
+
+        // 4. Send response
+        await _chatRepository.sendMessage(
+          widget.chat.id,
+          aiResponse,
+          'anvil_1_beta',
+        );
+      }
 
       // Auto-scroll to bottom
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -453,13 +483,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          message.content,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: isMe
-                                ? Colors.white
-                                : Theme.of(context).textTheme.bodyLarge?.color,
+                        MarkdownBody(
+                          data: message.content,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              fontSize: 16,
+                              color: isMe
+                                  ? Colors.white
+                                  : Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge?.color,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),
