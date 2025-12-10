@@ -48,7 +48,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ),
               ),
               child: Text(
-                'BETA',
+                'PREVIEW',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
