@@ -56,8 +56,8 @@ These are global services that power the entire app.
 
 ```mermaid
 graph LR
-    User -->|Interacts| UI[Frontend UI\n(Screens/Widgets)]
-    UI -->|Calls| Repo[Repositories\n(Data Layer)]
-    Repo -->|API Calls| Firebase[(Firebase Cloud\nAuth & DB)]
-    Repo -->|API Calls| AI[AI Service\n(Anvil API)]
+    User -->|Interacts| UI["Frontend UI\n(Screens/Widgets)"]
+    UI -->|Calls| Repo["Repositories\n(Data Layer)"]
+    Repo -->|API Calls| Firebase[("Firebase Cloud\nAuth & DB")]
+    Repo -->|API Calls| AI["AI Service\n(Anvil API)"]
 ```
