@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart'; // Import Geolocator
 
 import 'package:straycare_demo/features/settings/settings_screen.dart';
 import 'package:straycare_demo/features/profile/widgets/edit_profile_sheet.dart';
@@ -14,6 +15,7 @@ import 'package:straycare_demo/features/profile/screens/order_history_screen.dar
 import 'package:straycare_demo/features/profile/repositories/user_repository.dart';
 import 'package:straycare_demo/features/create_post/repositories/post_repository.dart';
 import 'package:straycare_demo/features/profile/screens/connections_screen.dart';
+import 'package:straycare_demo/features/profile/screens/clinics_near_me_screen.dart'; // Import Screen
 import 'package:straycare_demo/features/home/widgets/post_card.dart';
 import 'package:straycare_demo/shared/enums.dart';
 import 'package:straycare_demo/shared/widgets/verified_badge.dart';
@@ -250,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
-                                    onSelected: (value) {
+                                    onSelected: (value) async {
                                       if (value == 'logout') {
                                         _signOut();
                                       } else if (value == 'settings') {
@@ -295,10 +297,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 const VetVerificationScreen(),
                                           ),
                                         );
+                                      } else if (value == 'clinics_near_me') {
+                                        // Check Location Service Status
+                                        bool isEnabled =
+                                            await Geolocator.isLocationServiceEnabled();
+                                        if (!isEnabled) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Please enable GPS to find nearby clinics.',
+                                                ),
+                                                backgroundColor:
+                                                    Colors.redAccent,
+                                              ),
+                                            );
+                                          }
+                                          return;
+                                        }
+
+                                        if (context.mounted) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const ClinicsNearMeScreen(),
+                                            ),
+                                          );
+                                        }
                                       }
                                     },
                                     itemBuilder: (BuildContext context) =>
                                         <PopupMenuEntry<String>>[
+                                          PopupMenuItem<String>(
+                                            value: 'clinics_near_me',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.local_hospital,
+                                                color: Color(0xFF6c7278),
+                                              ),
+                                              title: const Text(
+                                                'Clinics Near Me',
+                                              ),
+                                              contentPadding: EdgeInsets.zero,
+                                              dense: true,
+                                            ),
+                                          ),
                                           PopupMenuItem<String>(
                                             value: 'settings',
                                             child: ListTile(
