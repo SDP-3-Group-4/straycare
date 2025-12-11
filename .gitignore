@@ -96,4 +96,5 @@ deploy.bat
 task.md
 implementation_plan.md
 walkthrough.md
+assets/service_account.json
 # lib/services/ai_service.dart
