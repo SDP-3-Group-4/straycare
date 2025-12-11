@@ -189,6 +189,8 @@ class _ClinicsNearMeScreenState extends State<ClinicsNearMeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -196,8 +198,10 @@ class _ClinicsNearMeScreenState extends State<ClinicsNearMeScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: isDarkMode
+            ? Theme.of(context).scaffoldBackgroundColor
+            : Colors.white,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black,
         elevation: 0,
       ),
       body: _currentPosition == null
@@ -280,12 +284,12 @@ class _ClinicsNearMeScreenState extends State<ClinicsNearMeScreen> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  color: Colors.grey[100],
+                  color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
                   child: Text(
                     'Found ${_clinics.length} Veterinary Clinics nearby',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey,
                     ),
                   ),
                 ),
@@ -308,13 +312,20 @@ class _ClinicsNearMeScreenState extends State<ClinicsNearMeScreen> {
                             final lat = double.parse(clinic['lat']);
                             final lon = double.parse(clinic['lon']);
 
+                            final isDarkMode =
+                                Theme.of(context).brightness == Brightness.dark;
+
                             return Card(
                               elevation: 0, // No Shadow
-                              color: Colors.white,
+                              color: isDarkMode
+                                  ? Color(0xFF1E1E1E)
+                                  : Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
-                                  color: Colors.grey.withOpacity(0.2),
+                                  color: isDarkMode
+                                      ? Colors.grey[800]!
+                                      : Colors.grey.withOpacity(0.2),
                                 ),
                               ),
                               margin: const EdgeInsets.symmetric(
@@ -322,11 +333,15 @@ class _ClinicsNearMeScreenState extends State<ClinicsNearMeScreen> {
                                 vertical: 6,
                               ),
                               child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: Color(0xFFF3E5F5),
+                                leading: CircleAvatar(
+                                  backgroundColor: isDarkMode
+                                      ? Colors.grey[800]
+                                      : const Color(0xFFF3E5F5),
                                   child: Icon(
                                     Icons.local_hospital,
-                                    color: Color(0xFF9C27B0),
+                                    color: isDarkMode
+                                        ? Colors.purpleAccent
+                                        : const Color(0xFF9C27B0),
                                   ),
                                 ),
                                 title: Text(

@@ -25,14 +25,18 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.brightness_6_outlined,
-            title: AppLocalizations.of(context).translate('system_appearance'),
+            title: Text(
+              AppLocalizations.of(context).translate('system_appearance'),
+            ),
             subtitle: _getThemeModeName(context),
             onTap: () => _showThemePicker(context),
           ),
           _buildListTile(
             context,
             icon: Icons.accessibility_new_outlined,
-            title: AppLocalizations.of(context).translate('accessibility'),
+            title: Text(
+              AppLocalizations.of(context).translate('accessibility'),
+            ),
             subtitle: AppLocalizations.of(context).translate('coming_soon'),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -49,7 +53,31 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.language_outlined,
-            title: AppLocalizations.of(context).translate('language'),
+            title: Row(
+              children: [
+                Text(AppLocalizations.of(context).translate('language')),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.purple, width: 0.5),
+                  ),
+                  child: const Text(
+                    'BETA',
+                    style: TextStyle(
+                      color: Colors.purple,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             subtitle: _getLanguageName(context),
             onTap: () => _showLanguagePicker(context),
           ),
@@ -61,7 +89,9 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.privacy_tip_outlined,
-            title: AppLocalizations.of(context).translate('privacy_safety'),
+            title: Text(
+              AppLocalizations.of(context).translate('privacy_safety'),
+            ),
             onTap: () {
               Navigator.push(
                 context,
@@ -74,7 +104,7 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.gavel_outlined,
-            title: AppLocalizations.of(context).translate('legal'),
+            title: Text(AppLocalizations.of(context).translate('legal')),
             onTap: () {
               Navigator.push(
                 context,
@@ -85,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
           _buildListTile(
             context,
             icon: Icons.info_outline,
-            title: AppLocalizations.of(context).translate('about'),
+            title: Text(AppLocalizations.of(context).translate('about')),
             onTap: () {
               showDialog(
                 context: context,
@@ -115,13 +145,13 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildListTile(
     BuildContext context, {
     required IconData icon,
-    required String title,
+    required Widget title,
     String? subtitle,
     required VoidCallback onTap,
   }) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey[600]),
-      title: Text(title),
+      title: title,
       subtitle: subtitle != null ? Text(subtitle) : null,
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
