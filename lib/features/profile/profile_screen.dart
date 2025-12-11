@@ -600,11 +600,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
-                                                  Image.asset(
-                                                    'assets/images/verified_vet.png',
-                                                    height: 40,
-                                                    fit: BoxFit.contain,
-                                                  ),
+                                                  if (isVerified)
+                                                    Image.asset(
+                                                      'assets/images/verified_vet.png',
+                                                      height: 40,
+                                                      fit: BoxFit.contain,
+                                                    ),
                                                 ],
                                               ),
                                             ],
@@ -798,6 +799,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             location: post['location'] ?? '',
                             category: _parseCategory(post['category']),
                             postContent: post['content'] ?? '',
+                            isEdited: post['isEdited'] ?? false,
                             postImageUrl: post['imageUrl'] ?? '',
                             likes: (post['likes'] as List?)?.length ?? 0,
                             comments: post['commentsCount'] ?? 0,

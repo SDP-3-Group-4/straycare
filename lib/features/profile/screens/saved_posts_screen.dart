@@ -156,6 +156,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
                   location: data['location'] ?? '',
                   category: category,
                   postContent: data['content'] ?? '',
+                  isEdited: data['isEdited'] ?? false,
                   postImageUrl: data['imageUrl'] ?? '',
                   likes: (data['likes'] as List?)?.length ?? 0,
                   comments: data['commentsCount'] ?? 0,

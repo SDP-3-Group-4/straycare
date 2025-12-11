@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; // Import Markdown
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../create_post/repositories/post_repository.dart';
@@ -13,6 +14,7 @@ class Comment {
   DateTime timestamp;
   bool isCurrentUser;
   bool isEdited;
+  bool isSystemComment; // New Field
 
   Comment({
     required this.id,
@@ -22,6 +24,7 @@ class Comment {
     required this.timestamp,
     this.isCurrentUser = false,
     this.isEdited = false,
+    this.isSystemComment = false,
   });
 }
 
@@ -283,6 +286,8 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                       isCurrentUser:
                           data['userId'] == _authService.currentUser?.uid,
                       isEdited: data['isEdited'] ?? false,
+                      isSystemComment:
+                          data['isSystemComment'] ?? false, // Load flag
                     );
                     return _buildCommentItem(context, comment);
                   },
@@ -420,6 +425,18 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
 
   Widget _buildCommentItem(BuildContext context, Comment comment) {
     final isExpanded = _expandedComments.contains(comment.id);
+    final isSystem = comment.isSystemComment; // Check sys flag
+
+    // Premium Colors for AI (Purple Theme)
+    final bgColor = isSystem
+        ? const Color(0xFFF3E5F5) // Light Purple (Purple 50)
+        : Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[800]
+        : Colors.grey[200];
+
+    final borderColor = isSystem
+        ? const Color(0xFF9C27B0)
+        : Colors.transparent; // Purple 500
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -433,13 +450,18 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                 padding: const EdgeInsets.only(top: 2.0),
                 child: CircleAvatar(
                   radius: 18,
-                  backgroundImage: comment.userAvatarUrl.isNotEmpty
-                      ? CachedNetworkImageProvider(comment.userAvatarUrl)
-                      : null,
-                  backgroundColor: Colors.grey[200],
-                  child: comment.userAvatarUrl.isEmpty
+                  backgroundImage: isSystem
+                      ? const AssetImage('assets/images/botx.jpg')
+                            as ImageProvider
+                      : (comment.userAvatarUrl.isNotEmpty
+                            ? CachedNetworkImageProvider(comment.userAvatarUrl)
+                            : null),
+                  backgroundColor: isSystem
+                      ? const Color(0xFFE1BEE7)
+                      : Colors.grey[200], // Purple 100
+                  child: (!isSystem && comment.userAvatarUrl.isEmpty)
                       ? const Icon(Icons.person)
-                      : null,
+                      : null, // No child icon for system as we use image
                 ),
               ),
               const SizedBox(width: 12),
@@ -453,10 +475,20 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey[800]
-                            : Colors.grey[200],
+                        color: bgColor,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor, width: 1),
+                        boxShadow: isSystem
+                            ? [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF9C27B0,
+                                  ).withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,12 +496,27 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                comment.userName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                              Row(
+                                children: [
+                                  Text(
+                                    comment.userName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isSystem
+                                          ? const Color(0xFF4A148C)
+                                          : null, // Purple 900
+                                    ),
+                                  ),
+                                  if (isSystem) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.verified,
+                                      size: 14,
+                                      color: Color(0xFF9C27B0),
+                                    ), // Purple 500
+                                  ],
+                                ],
                               ),
                               if (comment.isCurrentUser)
                                 SizedBox(
@@ -514,16 +561,31 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            comment.content,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyMedium?.color,
-                              fontSize: 14,
-                            ),
-                          ),
+                          const SizedBox(
+                            height: 4,
+                          ), // Increased spacing slightly
+                          isSystem
+                              ? MarkdownBody(
+                                  data: comment.content,
+                                  styleSheet: MarkdownStyleSheet(
+                                    p: TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 14,
+                                    ),
+                                    strong: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ), // Ensure bold works
+                                  ),
+                                )
+                              : Text(
+                                  comment.content,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium?.color,
+                                    fontSize: 14,
+                                  ),
+                                ),
                         ],
                       ),
                     ),
@@ -551,18 +613,19 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                               ),
                             ),
                           const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () =>
-                                _handleReply(comment.id, comment.userName),
-                            child: Text(
-                              'Reply',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                          if (!isSystem) // Disable reply for System currently
+                            GestureDetector(
+                              onTap: () =>
+                                  _handleReply(comment.id, comment.userName),
+                              child: Text(
+                                'Reply',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -622,6 +685,7 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                                   data['userId'] ==
                                   _authService.currentUser?.uid,
                               isEdited: data['isEdited'] ?? false,
+                              isSystemComment: data['isSystemComment'] ?? false,
                             );
                             return _buildReplyItem(context, reply, comment.id);
                           },

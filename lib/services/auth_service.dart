@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../features/profile/repositories/user_repository.dart';
+import 'notification_service.dart';
 
 /// AuthService handles all authentication‑related operations.
 ///
@@ -103,6 +104,9 @@ class AuthService {
         });
       }
 
+      // Save FCM Token
+      await NotificationService().getToken();
+
       return cred;
     } on FirebaseAuthException {
       rethrow;
@@ -126,6 +130,9 @@ class AuthService {
           'lastLogin': FieldValue.serverTimestamp(),
         });
       }
+
+      // Save FCM Token
+      await NotificationService().getToken();
 
       return userCredential;
     } on FirebaseAuthException {
@@ -200,6 +207,9 @@ class AuthService {
           });
         }
       }
+
+      // Save FCM Token
+      await NotificationService().getToken();
 
       return userCredential;
     } catch (e) {

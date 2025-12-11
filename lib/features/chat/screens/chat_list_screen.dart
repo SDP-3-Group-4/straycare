@@ -376,11 +376,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              chat.lastMessage,
+                              '${(chat.unreadCount == 0 && chat.lastMessageSenderId == _currentUserId) ? 'You: ' : ''}${chat.lastMessage}',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: chat.unreadCount > 0
-                                    ? Colors.black87
+                                    ? Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color
                                     : Colors.grey[600],
                                 fontWeight: chat.unreadCount > 0
                                     ? FontWeight.bold

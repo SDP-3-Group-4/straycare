@@ -36,7 +36,11 @@ const String kLocationIqKey = String.fromEnvironment(
 const String kDefaultCountryCode = 'bd';
 
 class CreatePostScreen extends StatefulWidget {
-  const CreatePostScreen({Key? key}) : super(key: key);
+  final Map<String, dynamic>? editPostData;
+  final String? editPostId;
+
+  const CreatePostScreen({Key? key, this.editPostData, this.editPostId})
+    : super(key: key);
 
   @override
   _CreatePostScreenState createState() => _CreatePostScreenState();
@@ -58,6 +62,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   PostCategory? _selectedCategory;
 
   String? _selectedPaymentMethod;
+  String? _existingImageUrl; // For storing URL when editing
 
   // Session token for Google Places API
   String? _sessionToken;
@@ -135,6 +140,37 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.initState();
     _postRepository = PostRepository();
     _locationController.addListener(_onLocationChanged);
+
+    // Initialize fields if editing
+    if (widget.editPostData != null) {
+      final data = widget.editPostData!;
+      _contentController.text = data['content'] ?? '';
+      _locationController.text = data['location'] ?? '';
+      _selectedLat = data['latitude'];
+      _selectedLon = data['longitude'];
+      _existingImageUrl = data['imageUrl'];
+
+      // Parse category
+      try {
+        if (data['category'] != null) {
+          _selectedCategory = PostCategory.values.firstWhere(
+            (e) => e.name == data['category'],
+          );
+        }
+      } catch (_) {}
+
+      if (_selectedCategory == PostCategory.fundraise) {
+        _fundraiseGoalController.text = (data['fundraiseGoal'] ?? 0.0)
+            .toString();
+        _selectedPaymentMethod = data['paymentMethod'];
+        if (data['bankDetails'] != null) {
+          final bank = data['bankDetails'];
+          _accountHolderController.text = bank['accountHolder'] ?? '';
+          _bankNameController.text = bank['bankName'] ?? '';
+          _bankAccountController.text = bank['accountNumber'] ?? '';
+        }
+      }
+    }
   }
 
   void _onLocationChanged() {
@@ -433,7 +469,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       });
 
       try {
-        String? imageUrl;
+        String? imageUrl = _existingImageUrl;
         if (_image != null) {
           final cloudinaryService = CloudinaryService();
           imageUrl = await cloudinaryService.uploadImage(_image!);
@@ -467,17 +503,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           }
         }
 
-        await _postRepository.createPost(postData);
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context).translate('post_created_success'),
+        if (widget.editPostId != null) {
+          await _postRepository.updatePost(widget.editPostId!, postData);
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Post updated successfully')));
+        } else {
+          await _postRepository.createPost(postData);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).translate('post_created_success'),
+              ),
             ),
-          ),
-        );
+          );
+        }
 
         Navigator.pop(context);
       } catch (e) {
@@ -592,7 +634,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       ),
                     )
                   : Text(
-                      AppLocalizations.of(context).translate('post'),
+                      widget.editPostId != null
+                          ? 'Update Post'
+                          : AppLocalizations.of(context).translate('post'),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

@@ -151,6 +151,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         category: _parseCategory(post['category']),
         location: post['location'] ?? '',
         timeAgo: _getTimeAgo(createdAt),
+        isEdited: post['isEdited'] ?? false,
       ),
     );
   }

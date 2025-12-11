@@ -151,7 +151,7 @@ class _CartScreenState extends State<CartScreen> {
                         if (_userId != null) {
                           await widget.repository.removeFromCart(
                             _userId!,
-                            cartItem.item.id,
+                            cartItem.id,
                           );
                         }
                       },

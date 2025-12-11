@@ -20,6 +20,14 @@ class PostRepository {
     return await _firestoreService.addDocument(_collectionPath, postData);
   }
 
+  /// Update an existing post
+  Future<void> updatePost(String postId, Map<String, dynamic> postData) async {
+    // Mark as edited
+    postData['isEdited'] = true;
+    // Do NOT update createdAt
+    await _firestoreService.updateDocument(_collectionPath, postId, postData);
+  }
+
   /// Like a post
   Future<void> likePost(String postId) async {
     final user = _auth.currentUser;
@@ -418,5 +426,12 @@ class PostRepository {
       _collectionPath,
       queryBuilder: (query) => query.where('authorId', isEqualTo: userId),
     );
+  }
+
+  /// Update AI Response Status
+  Future<void> updateAiStatus(String postId, String status) async {
+    await _firestoreService.updateDocument(_collectionPath, postId, {
+      'aiResponseStatus': status,
+    });
   }
 }

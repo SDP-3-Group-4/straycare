@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../ai_bot/models/chat_model.dart';
+import '../../../services/notification_service.dart';
 
 class ChatRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -105,6 +106,7 @@ class ChatRepository {
                 unreadCount: data['unreadCounts']?[userId] ?? 0,
                 iconEmoji: data['iconEmoji'],
                 isVerified: isVerified,
+                lastMessageSenderId: data['lastMessageSenderId'],
               ),
             );
           }
@@ -184,6 +186,7 @@ class ChatRepository {
       final Map<String, dynamic> updates = {
         'lastMessage': content,
         'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': senderId,
       };
 
       if (hasUnreadCounts) {
@@ -203,6 +206,52 @@ class ChatRepository {
       }
 
       await _firestore.collection('chats').doc(chatId).update(updates);
+
+      // --- Send Push Notifications (Client-Side) ---
+      try {
+        // 1. Get Sender's Name
+        String senderName = 'StrayCare User';
+        final senderDoc = await _firestore
+            .collection('users')
+            .doc(senderId)
+            .get();
+        if (senderDoc.exists) {
+          senderName = senderDoc.data()?['displayName'] ?? 'StrayCare User';
+        }
+
+        // 2. Iterate Participants and Send
+        for (var uid in participants) {
+          if (uid != senderId) {
+            final userDoc = await _firestore.collection('users').doc(uid).get();
+            if (userDoc.exists) {
+               final userData = userDoc.data();
+               final String? token = userData?['fcmToken'];
+ 
+               print('User $uid token: $token'); // DEBUG
+ 
+               if (token != null && token.isNotEmpty) {
+                  print('Attempting to send push to $uid'); // DEBUG
+                  await NotificationService().sendNotification(
+                    recipientToken: token,
+                    title: senderName,
+                    body: content,
+                    data: {
+                      'type': 'chat',
+                      'chatId': chatId,
+                      'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                    },
+                  );
+               } else {
+                 print('No token found for user $uid'); // DEBUG
+               }
+            } else {
+              print('User document not found for $uid'); // DEBUG
+            }
+          }
+        }
+      } catch (e) {
+        print('Error sending push notification: $e');
+      }
     }
   }
 

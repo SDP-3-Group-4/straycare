@@ -13,6 +13,7 @@ import 'user_profile_dialog.dart';
 import '../../../../services/auth_service.dart';
 import '../../../shared/widgets/verified_badge.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../create_post/create_post_screen.dart';
 
 class PostCard extends StatefulWidget {
   final String postId;
@@ -36,6 +37,7 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onDelete;
   final bool isCompact;
   final bool isAuthorVerified;
+  final bool isEdited;
 
   const PostCard({
     Key? key,
@@ -60,6 +62,7 @@ class PostCard extends StatefulWidget {
     this.onDelete,
     this.isCompact = false,
     this.isAuthorVerified = false,
+    this.isEdited = false,
   }) : super(key: key);
 
   @override
@@ -217,6 +220,7 @@ class _PostCardState extends State<PostCard> {
   @override
   Widget build(BuildContext context) {
     final isFundraise = widget.category == PostCategory.fundraise;
+    final isMe = widget.userId == AuthService().currentUser?.uid;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -279,12 +283,29 @@ class _PostCardState extends State<PostCard> {
                                         const VerifiedBadge(size: 14),
                                     ],
                                   ),
-                                  Text(
-                                    widget.timeAgo,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
+                                  Wrap(
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      Text(
+                                        widget.timeAgo,
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      if (widget.isEdited) ...[
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '(Edited)',
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   if (widget.location.isNotEmpty)
                                     InkWell(
@@ -335,50 +356,69 @@ class _PostCardState extends State<PostCard> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: widget.category.color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Icon(
-                          widget.category.icon,
-                          size: 16,
-                          color: widget.category.color,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.category.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: widget.category.color,
-                          ),
+                        decoration: BoxDecoration(
+                          color: widget.category.color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ],
-                    ),
-                  ),
-                  if (widget.onDelete != null) ...[
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: widget.onDelete,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 20,
-                          color: Colors.grey[600],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(
+                              widget.category.icon,
+                              size: 16,
+                              color: widget.category.color,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.category.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: widget.category.color,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      if (isMe && widget.onDelete != null)
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.more_horiz, color: Colors.grey[600]),
+                          onSelected: (value) async {
+                            if (value == 'delete') {
+                              widget.onDelete?.call();
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.delete,
+                                    size: 18,
+                                    color: Colors.red,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -467,18 +507,50 @@ class _PostCardState extends State<PostCard> {
                     onPressed: _showCommentSheet,
                     style: TextButton.styleFrom(padding: EdgeInsets.zero),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                      color: Theme.of(context).primaryColor,
+                  if (isMe)
+                    TextButton.icon(
+                      icon: Icon(
+                        Icons.edit,
+                        color: Theme.of(context).primaryColor,
+                        size: 18,
+                      ),
+                      label: Text(
+                        'Edit',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CreatePostScreen(
+                              editPostData: {
+                                'content': widget.postContent,
+                                'imageUrl': widget.postImageUrl,
+                                'category': widget.category.name,
+                                'location': widget.location,
+                                'fundraiseGoal': widget.goalAmount,
+                                'paymentMethod': 'bank_transfer',
+                              },
+                              editPostId: widget.postId,
+                            ),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                    )
+                  else
+                    IconButton(
+                      icon: Icon(
+                        _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isSaved = !_isSaved;
+                        });
+                        widget.onSave?.call();
+                      },
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _isSaved = !_isSaved;
-                      });
-                      widget.onSave?.call();
-                    },
-                  ),
                 ],
               ),
             ],

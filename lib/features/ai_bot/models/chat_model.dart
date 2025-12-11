@@ -10,8 +10,9 @@ class Chat {
   final bool isAiBot;
   final String? tag; // e.g., "Ask Vet Bot"
   final int unreadCount;
-  final String? iconEmoji; // New field for group emoji
+  final String? iconEmoji;
   final bool isVerified;
+  final String? lastMessageSenderId;
 
   Chat({
     required this.id,
@@ -24,6 +25,7 @@ class Chat {
     this.unreadCount = 0,
     this.iconEmoji,
     this.isVerified = false,
+    this.lastMessageSenderId,
   });
 
   /// Convert to JSON for backend
@@ -39,6 +41,7 @@ class Chat {
       'unreadCount': unreadCount,
       'iconEmoji': iconEmoji,
       'isVerified': isVerified,
+      'lastMessageSenderId': lastMessageSenderId,
     };
   }
 
@@ -55,6 +58,7 @@ class Chat {
       unreadCount: json['unreadCount'] as int? ?? 0,
       iconEmoji: json['iconEmoji'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
+      lastMessageSenderId: json['lastMessageSenderId'] as String?,
     );
   }
 }

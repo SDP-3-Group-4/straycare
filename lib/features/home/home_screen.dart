@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../shared/enums.dart';
+import '../../services/auto_response_service.dart';
 
 import '../notifications/notifications_screen.dart';
 import '../notifications/repositories/notification_repository.dart';
@@ -32,6 +33,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _scrollController.position.maxScrollExtent - 200) {
         provider.loadMorePosts();
       }
+    });
+
+    // Trigger Auto Response Check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AutoResponseService().checkAndRespondToRescuePosts();
     });
   }
 
@@ -281,6 +287,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         onSave: () {
                           provider.toggleSave(post.id);
                         },
+                        isEdited: data['isEdited'] ?? false,
+                        isAuthorVerified:
+                            data['isVerified'] ??
+                            false, // Best effort mapping if available
                       );
                     }, childCount: provider.posts.length + 1),
                   ),

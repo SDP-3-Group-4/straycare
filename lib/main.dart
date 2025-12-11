@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Add this line
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/home/providers/home_provider.dart';
@@ -21,14 +22,22 @@ import 'features/marketplace/providers/marketplace_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'features/chat/repositories/chat_repository.dart';
 import 'services/auth_service.dart';
+import 'services/notification_service.dart';
 
 // --- MAIN FUNCTION ---
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('DotEnv initialization error: $e');
+  }
+  try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // Initialize Push Notifications
+    await NotificationService().initialize();
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
   }
