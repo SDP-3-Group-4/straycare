@@ -14,23 +14,13 @@ import 'repositories/post_repository.dart';
 import '../../services/auth_service.dart';
 import '../../services/cloudinary_service.dart';
 
-// Google Places API key is read from a compile-time define for safety.
-// Provide it when running the app with: --dart-define=GOOGLE_API_KEY=your_key
-const String _kGoogleApiKeyDefault =
-    "AIzaSyDOO4qKgX0AkgWP56CvR52lNpKrslTel7M"; // placeholder
-const String kGoogleApiKey = String.fromEnvironment(
-  'GOOGLE_API_KEY',
-  defaultValue: _kGoogleApiKeyDefault,
-);
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+// Google Places API key
+final String kGoogleApiKey = dotenv.env['GOOGLE_API_KEY'] ?? '';
 
 // LocationIQ API key (autocomplete).
-// NOTE: You've chosen to embed the token in code. This is convenient for local
-// testing but not recommended for production. Remove the hardcoded key and use
-// a secure method before shipping.
-const String kLocationIqKey = String.fromEnvironment(
-  'LOCATIONIQ_KEY',
-  defaultValue: 'pk.50eba6900fabc82e98a8a8431bb36431',
-);
+final String kLocationIqKey = dotenv.env['LOCATIONIQ_KEY'] ?? '';
 
 // Default country code to restrict searches (ISO 3166-1 alpha-2). Use 'bd' for Bangladesh.
 const String kDefaultCountryCode = 'bd';

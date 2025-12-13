@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/widgets.dart'; // Explicit import if needed, but usually material covers it
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:googleapis_auth/auth_io.dart';
-
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -114,10 +114,15 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     try {
-      // 1. Load the Service Account Key
-      final String serviceAccountString = await rootBundle.loadString(
-        'assets/service_account.json',
-      );
+      // 1. Load the Service Account Key from .env
+      final String serviceAccountString =
+          dotenv.env['GOOGLE_SERVICE_ACCOUNT_JSON'] ?? '';
+
+      if (serviceAccountString.isEmpty) {
+        debugPrint('Error: GOOGLE_SERVICE_ACCOUNT_JSON not found in .env');
+        return;
+      }
+
       final serviceAccountJson = jsonDecode(serviceAccountString);
 
       final credentials = ServiceAccountCredentials.fromJson(
