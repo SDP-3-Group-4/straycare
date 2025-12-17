@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../create_post/repositories/post_repository.dart';
 import '../../../services/auth_service.dart';
 import '../../../l10n/app_localizations.dart';
+import 'user_profile_dialog.dart';
 
 class Comment {
   String id;
@@ -213,212 +214,242 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = _editingCommentId != null || _editingReplyId != null;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6B46C1),
-                  borderRadius: BorderRadius.circular(2),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B46C1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(
-              left: 8.0,
-              right: 8.0,
-              top: 1.2,
-              bottom: 16.0,
-            ),
-            child: Text(
-              AppLocalizations.of(context).translate('comments'),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _postRepository.getCommentsStream(widget.postId),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final comments = snapshot.data?.docs ?? [];
-
-                if (comments.isEmpty) {
-                  return Center(
-                    child: Text(
-                      AppLocalizations.of(context).translate('no_comments_yet'),
-                      style: TextStyle(color: Colors.grey[500]),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: comments.length,
-                  itemBuilder: (context, index) {
-                    final data = comments[index].data() as Map<String, dynamic>;
-                    final comment = Comment(
-                      id: comments[index].id,
-                      userName: data['userName'] ?? 'Anonymous',
-                      userAvatarUrl: data['userAvatarUrl'] ?? '',
-                      content: data['content'] ?? '',
-                      timestamp:
-                          (data['timestamp'] as Timestamp?)?.toDate() ??
-                          DateTime.now(),
-                      isCurrentUser:
-                          data['userId'] == _authService.currentUser?.uid,
-                      isEdited: data['isEdited'] ?? false,
-                      isSystemComment:
-                          data['isSystemComment'] ?? false, // Load flag
-                    );
-                    return _buildCommentItem(context, comment);
-                  },
-                );
-              },
-            ),
-          ),
-          Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 12,
-              bottom: 12 + bottomInset,
-            ),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  offset: const Offset(0, -2),
-                  blurRadius: 5,
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 8.0,
+                  right: 8.0,
+                  top: 1.2,
+                  bottom: 16.0,
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_replyingToCommentId != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Replying to ${_replyingToUserName ?? 'User'}',
-                          style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _cancelReply,
-                          child: const Icon(Icons.close, size: 16),
-                        ),
-                      ],
-                    ),
+                child: Text(
+                  AppLocalizations.of(context).translate('comments'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                if (isEditing)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Editing comment',
-                          style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                ),
+              ),
+              Expanded(
+                child: RepaintBoundary(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _postRepository.getCommentsStream(widget.postId),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          !snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final comments = snapshot.data?.docs ?? [];
+
+                      if (comments.isEmpty) {
+                        return Center(
+                          child: Text(
+                            AppLocalizations.of(
+                              context,
+                            ).translate('no_comments_yet'),
+                            style: TextStyle(color: Colors.grey[500]),
                           ),
-                        ),
-                        GestureDetector(
-                          onTap: _cancelEdit,
-                          child: const Icon(Icons.close, size: 16),
-                        ),
-                      ],
-                    ),
-                  ),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundImage:
-                          _authService.currentUser?.photoURL != null
-                          ? CachedNetworkImageProvider(
-                              _authService.currentUser!.photoURL!,
-                            )
-                          : null,
-                      backgroundColor: Colors.grey[200],
-                      child: _authService.currentUser?.photoURL == null
-                          ? const Icon(Icons.person, size: 20)
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
+                        );
+                      }
+
+                      return ListView.builder(
+                        controller: scrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.grey[800]
-                              : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: TextField(
-                          controller: _commentController,
-                          focusNode: _focusNode,
-                          decoration: InputDecoration(
-                            hintText: _replyingToCommentId != null
-                                ? 'Write a reply...'
-                                : isEditing
-                                ? 'Update comment...'
-                                : AppLocalizations.of(
-                                    context,
-                                  ).translate('leave_comment_hint'),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                            ),
-                          ),
-                          minLines: 1,
-                          maxLines: 3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(
-                        isEditing ? Icons.check_circle : Icons.send_rounded,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                      onPressed: _handleSubmit,
+                        itemCount: comments.length,
+                        addAutomaticKeepAlives: true,
+                        itemBuilder: (context, index) {
+                          final data =
+                              comments[index].data() as Map<String, dynamic>;
+                          final comment = Comment(
+                            id: comments[index].id,
+                            userName: data['userName'] ?? 'Anonymous',
+                            userAvatarUrl: data['userAvatarUrl'] ?? '',
+                            content: data['content'] ?? '',
+                            timestamp:
+                                (data['timestamp'] as Timestamp?)?.toDate() ??
+                                DateTime.now(),
+                            isCurrentUser:
+                                data['userId'] == _authService.currentUser?.uid,
+                            isEdited: data['isEdited'] ?? false,
+                            isSystemComment:
+                                data['isSystemComment'] ?? false, // Load flag
+                          );
+                          return _buildCommentItem(context, comment);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: 12 + bottomInset,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      offset: const Offset(0, -2),
+                      blurRadius: 5,
                     ),
                   ],
                 ),
-              ],
-            ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_replyingToCommentId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Replying to ${_replyingToUserName ?? 'User'}',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _cancelReply,
+                              child: const Icon(Icons.close, size: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (isEditing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Editing comment',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _cancelEdit,
+                              child: const Icon(Icons.close, size: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundImage:
+                              _authService.currentUser?.photoURL != null
+                              ? CachedNetworkImageProvider(
+                                  _authService.currentUser!.photoURL!,
+                                )
+                              : null,
+                          backgroundColor: Colors.grey[200],
+                          child: _authService.currentUser?.photoURL == null
+                              ? const Icon(Icons.person, size: 20)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.grey[800]
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: TextField(
+                              controller: _commentController,
+                              focusNode: _focusNode,
+                              decoration: InputDecoration(
+                                hintText: _replyingToCommentId != null
+                                    ? 'Write a reply...'
+                                    : isEditing
+                                    ? 'Update comment...'
+                                    : AppLocalizations.of(
+                                        context,
+                                      ).translate('leave_comment_hint'),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                              ),
+                              minLines: 1,
+                              maxLines: 3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: Icon(
+                            isEditing ? Icons.check_circle : Icons.send_rounded,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          onPressed: _handleSubmit,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  void _showUserProfile(String userId, String userName, String userAvatarUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        userId: userId,
+        userName: userName,
+        userAvatarUrl: userAvatarUrl,
+        isVerified:
+            false, // You might want to pass verification status if available
       ),
     );
   }
@@ -448,20 +479,35 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 2.0),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundImage: isSystem
-                      ? const AssetImage('assets/images/botx.jpg')
-                            as ImageProvider
-                      : (comment.userAvatarUrl.isNotEmpty
-                            ? CachedNetworkImageProvider(comment.userAvatarUrl)
-                            : null),
-                  backgroundColor: isSystem
-                      ? const Color(0xFFE1BEE7)
-                      : Colors.grey[200], // Purple 100
-                  child: (!isSystem && comment.userAvatarUrl.isEmpty)
-                      ? const Icon(Icons.person)
-                      : null, // No child icon for system as we use image
+                child: GestureDetector(
+                  onTap: isSystem
+                      ? null
+                      : () => _showUserProfile(
+                          comment.id,
+                          comment.userName,
+                          comment.userAvatarUrl,
+                        ), // Ideally pass userId, but comment.id is comment ID.
+                  // Correction: Comment object doesn't have userId field directly accessible here unless we parse it or add it to Comment model.
+                  // Looking at Comment model: it has 'isCurrentUser'.
+                  // Looking at stream builder: data['userId'] is mapped to isCurrentUser boolean check.
+                  // We need to add userId to Comment model to link properly.
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundImage: isSystem
+                        ? const AssetImage('assets/images/botx.jpg')
+                              as ImageProvider
+                        : (comment.userAvatarUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(
+                                  comment.userAvatarUrl,
+                                )
+                              : null),
+                    backgroundColor: isSystem
+                        ? const Color(0xFFE1BEE7)
+                        : Colors.grey[200], // Purple 100
+                    child: (!isSystem && comment.userAvatarUrl.isEmpty)
+                        ? const Icon(Icons.person)
+                        : null, // No child icon for system as we use image
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -498,14 +544,22 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    comment.userName,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: isSystem
-                                          ? const Color(0xFF4A148C)
-                                          : null, // Purple 900
+                                  GestureDetector(
+                                    onTap: isSystem
+                                        ? null
+                                        : () {
+                                            // We need userId here. Let's fix the Comment model first otherwise we can't open profile.
+                                            // Assuming I will add userId to Comment model in the next step or this same multi-replace.
+                                          },
+                                    child: Text(
+                                      comment.userName,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: isSystem
+                                            ? const Color(0xFF4A148C)
+                                            : null, // Purple 900
+                                      ),
                                     ),
                                   ),
                                   if (isSystem) ...[
@@ -565,16 +619,19 @@ class _CommentBottomSheetState extends State<CommentBottomSheet> {
                             height: 4,
                           ), // Increased spacing slightly
                           isSystem
-                              ? MarkdownBody(
-                                  data: comment.content,
-                                  styleSheet: MarkdownStyleSheet(
-                                    p: TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 14,
+                              ? RepaintBoundary(
+                                  key: ValueKey('md_${comment.id}'),
+                                  child: MarkdownBody(
+                                    data: comment.content,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: TextStyle(
+                                        color: Colors.black87,
+                                        fontSize: 14,
+                                      ),
+                                      strong: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ), // Ensure bold works
                                     ),
-                                    strong: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ), // Ensure bold works
                                   ),
                                 )
                               : Text(

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../features/profile/repositories/user_repository.dart';
 import 'notification_service.dart';
+import 'presence_service.dart';
 
 /// AuthService handles all authentication‑related operations.
 ///
@@ -170,15 +171,7 @@ class AuthService {
       final userCredential = await _auth.signInWithCredential(credential);
       print('Firebase Sign In successful: ${userCredential.user?.uid}');
 
-      // Propagate Google profile info to Firebase user record
-      if (googleUser.displayName != null) {
-        await userCredential.user?.updateDisplayName(googleUser.displayName!);
-        print('Updated display name: ${googleUser.displayName}');
-      }
-      if (googleUser.photoUrl != null) {
-        await userCredential.user?.updatePhotoURL(googleUser.photoUrl!);
-        print('Updated photo URL: ${googleUser.photoUrl}');
-      }
+      // Note: displayName and photoUrl are updated conditionally below to preserve custom values
 
       // Save user to Firestore
       if (userCredential.user != null) {
@@ -187,7 +180,7 @@ class AuthService {
         );
 
         if (!userDoc.exists) {
-          // New user: Create with default bio
+          // New user: Create with Google photo and default bio
           await UserRepository().saveUser(userCredential.user!.uid, {
             'email': googleUser.email,
             'displayName': googleUser.displayName ?? 'User',
@@ -196,15 +189,52 @@ class AuthService {
             'lastLogin': FieldValue.serverTimestamp(),
             'createdAt': FieldValue.serverTimestamp(),
           });
+          // Also update Firebase Auth photo for new users
+          if (googleUser.photoUrl != null) {
+            await userCredential.user?.updatePhotoURL(googleUser.photoUrl!);
+          }
         } else {
-          // Existing user: Update only necessary fields, preserve bio
-          // Use saveUser to ensure verifiedStatus checks are applied
+          // Existing user: Preserve custom photo and display name if they exist
+          final existingData = userDoc.data() as Map<String, dynamic>?;
+          final existingPhotoUrl = existingData?['photoUrl'] as String? ?? '';
+          final existingDisplayName =
+              existingData?['displayName'] as String? ?? '';
+          final hasChangedDisplayName =
+              existingData?['hasChangedDisplayName'] ?? false;
+
+          // Check if existing photo is custom (not from Google/Gravatar)
+          final bool hasCustomPhoto =
+              existingPhotoUrl.isNotEmpty &&
+              !existingPhotoUrl.contains('googleusercontent.com') &&
+              !existingPhotoUrl.contains('gravatar.com');
+
+          // Update Firestore - preserve custom photo and display name
           await UserRepository().saveUser(userCredential.user!.uid, {
             'email': googleUser.email,
-            'displayName': googleUser.displayName ?? 'User',
-            'photoUrl': googleUser.photoUrl ?? '',
+            // Only update display name if user hasn't changed it manually
+            if (!hasChangedDisplayName)
+              'displayName': googleUser.displayName ?? 'User',
+            if (!hasCustomPhoto) 'photoUrl': googleUser.photoUrl ?? '',
             'lastLogin': FieldValue.serverTimestamp(),
           });
+
+          // Update Firebase Auth photo only if no custom photo
+          if (!hasCustomPhoto && googleUser.photoUrl != null) {
+            await userCredential.user?.updatePhotoURL(googleUser.photoUrl!);
+          } else if (hasCustomPhoto) {
+            // Restore custom photo to Firebase Auth if it exists
+            await userCredential.user?.updatePhotoURL(existingPhotoUrl);
+          }
+
+          // Update Firebase Auth display name only if not manually changed
+          if (!hasChangedDisplayName && googleUser.displayName != null) {
+            await userCredential.user?.updateDisplayName(
+              googleUser.displayName!,
+            );
+          } else if (hasChangedDisplayName && existingDisplayName.isNotEmpty) {
+            // Restore custom display name to Firebase Auth
+            await userCredential.user?.updateDisplayName(existingDisplayName);
+          }
         }
       }
 
@@ -223,6 +253,8 @@ class AuthService {
   // ---------------------------------------------------------------------
   Future<void> signOut() async {
     try {
+      // Mark user as offline before signing out
+      await PresenceService().goOffline();
       await _auth.signOut();
       try {
         final googleSignIn = _getGoogleSignIn();

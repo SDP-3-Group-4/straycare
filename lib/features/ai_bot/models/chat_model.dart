@@ -13,6 +13,8 @@ class Chat {
   final String? iconEmoji;
   final bool isVerified;
   final String? lastMessageSenderId;
+  final bool isGroup;
+  final List<String>? participantIds;
 
   Chat({
     required this.id,
@@ -26,6 +28,8 @@ class Chat {
     this.iconEmoji,
     this.isVerified = false,
     this.lastMessageSenderId,
+    this.isGroup = false,
+    this.participantIds,
   });
 
   /// Convert to JSON for backend
@@ -42,6 +46,8 @@ class Chat {
       'iconEmoji': iconEmoji,
       'isVerified': isVerified,
       'lastMessageSenderId': lastMessageSenderId,
+      'isGroup': isGroup,
+      'participantIds': participantIds,
     };
   }
 
@@ -59,6 +65,9 @@ class Chat {
       iconEmoji: json['iconEmoji'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
       lastMessageSenderId: json['lastMessageSenderId'] as String?,
+      isGroup: json['isGroup'] as bool? ?? false,
+      participantIds: (json['participantIds'] as List<dynamic>?)
+          ?.cast<String>(),
     );
   }
 }

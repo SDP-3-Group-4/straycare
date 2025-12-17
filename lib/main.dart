@@ -4,8 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/home/providers/home_provider.dart';
+import 'providers/connectivity_provider.dart';
 import 'firebase_options.dart';
 
 import 'features/auth/login_screen.dart';
@@ -23,6 +25,7 @@ import 'l10n/app_localizations.dart';
 import 'features/chat/repositories/chat_repository.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/presence_service.dart';
 
 // --- MAIN FUNCTION ---
 void main() async {
@@ -36,6 +39,13 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Enable Firestore offline persistence with larger cache
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+
     // Initialize Push Notifications
     await NotificationService().initialize();
   } catch (e) {
@@ -54,6 +64,7 @@ class StrayCareDemoApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider(create: (_) => MarketplaceProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         Provider<MarketplaceService>(
           create: (_) => FirestoreMarketplaceService(),
         ),
@@ -211,8 +222,10 @@ class MainAppShell extends StatefulWidget {
   _MainAppShellState createState() => _MainAppShellState();
 }
 
-class _MainAppShellState extends State<MainAppShell> {
+class _MainAppShellState extends State<MainAppShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  final PresenceService _presenceService = PresenceService();
 
   // List now refers to the imported screen classes
   final List<Widget> _screens = [
@@ -229,111 +242,186 @@ class _MainAppShellState extends State<MainAppShell> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _presenceService.goOnline();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceService.goOffline();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _presenceService.goOnline();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _presenceService.goOffline();
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home),
-            label: AppLocalizations.of(context).translate('home'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.storefront_outlined),
-            activeIcon: const Icon(Icons.storefront_rounded),
-            label: AppLocalizations.of(context).translate('marketplace'),
-          ),
-          BottomNavigationBarItem(
-            icon: StreamBuilder<int>(
-              stream: ChatRepository().getTotalUnreadCountStream(
-                AuthService().currentUser?.uid ?? '',
+    return Consumer<ConnectivityProvider>(
+      builder: (context, connectivity, child) {
+        return Scaffold(
+          body: Column(
+            children: [
+              // Offline Banner
+              if (!connectivity.isOnline)
+                Container(
+                  width: double.infinity,
+                  color: Colors.grey[800],
+                  child: SafeArea(
+                    bottom: false,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.wifi_off,
+                            size: 16,
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "You're currently offline",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: IndexedStack(index: _currentIndex, children: _screens),
               ),
-              builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
-                return Stack(
-                  children: [
-                    const Icon(Icons.chat_bubble_outline),
-                    if (count > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Center(
-                            child: Text(
-                              count > 99 ? '99+' : '$count',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+            ],
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: _onTabTapped,
+            items: [
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.home_outlined),
+                activeIcon: const Icon(Icons.home),
+                label: AppLocalizations.of(context).translate('home'),
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.storefront_outlined),
+                activeIcon: const Icon(Icons.storefront_rounded),
+                label: AppLocalizations.of(context).translate('marketplace'),
+              ),
+              BottomNavigationBarItem(
+                icon: StreamBuilder<int>(
+                  stream: ChatRepository().getTotalUnreadCountStream(
+                    AuthService().currentUser?.uid ?? '',
+                  ),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data ?? 0;
+                    return Stack(
+                      children: [
+                        const Icon(Icons.chat_bubble_outline),
+                        if (count > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
                               ),
-                              textAlign: TextAlign.center,
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  count > 99 ? '99+' : '$count',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-            activeIcon: StreamBuilder<int>(
-              stream: ChatRepository().getTotalUnreadCountStream(
-                AuthService().currentUser?.uid ?? '',
+                      ],
+                    );
+                  },
+                ),
+                activeIcon: StreamBuilder<int>(
+                  stream: ChatRepository().getTotalUnreadCountStream(
+                    AuthService().currentUser?.uid ?? '',
+                  ),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data ?? 0;
+                    return Stack(
+                      children: [
+                        const Icon(Icons.chat_bubble),
+                        if (count > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 12,
+                                minHeight: 12,
+                              ),
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                label: AppLocalizations.of(context).translate('ai_bot'),
               ),
-              builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
-                return Stack(
-                  children: [
-                    const Icon(Icons.chat_bubble),
-                    if (count > 0)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 12,
-                            minHeight: 12,
-                          ),
-                          child: Text(
-                            '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-            label: AppLocalizations.of(context).translate('ai_bot'),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.person_outline),
+                activeIcon: const Icon(Icons.person),
+                label: AppLocalizations.of(context).translate('profile'),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            activeIcon: const Icon(Icons.person),
-            label: AppLocalizations.of(context).translate('profile'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

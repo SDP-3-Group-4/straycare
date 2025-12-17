@@ -189,73 +189,30 @@ class UserRepository {
     return allDocs;
   }
 
-  /// Search users by display name (simple prefix match)
+  /// Search users by display name or email (client-side filtering for robustness)
   Future<List<DocumentSnapshot>> searchUsers(String query) async {
     if (query.isEmpty) return [];
 
-    final normalizedQuery = query;
+    final normalizedQuery = query.toLowerCase().trim();
 
-    // 1. Search by 'searchKey' (Case-Insensitive for updated users)
-    final searchKeyQuery = normalizedQuery.toLowerCase();
-    final searchKeySnapshot = await _firestoreService
-        .getCollectionStream(
-          _collectionPath,
-          queryBuilder: (query) => query
-              .where('searchKey', isGreaterThanOrEqualTo: searchKeyQuery)
-              .where('searchKey', isLessThan: searchKeyQuery + '\uf8ff')
-              .limit(20),
-        )
+    // Fetch all users (limited to 100 for performance)
+    final snapshot = await _firestoreService
+        .getCollectionStream(_collectionPath, queryBuilder: (q) => q.limit(100))
         .first;
 
-    // 2. Search by 'displayName' (Raw input - Case-Sensitive fallback)
-    final displayNameSnapshot = await _firestoreService
-        .getCollectionStream(
-          _collectionPath,
-          queryBuilder: (query) => query
-              .where('displayName', isGreaterThanOrEqualTo: normalizedQuery)
-              .where('displayName', isLessThan: normalizedQuery + '\uf8ff')
-              .limit(20),
-        )
-        .first;
+    // Client-side filtering for robust matching
+    final filtered = snapshot.docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final displayName = (data['displayName'] ?? '').toString().toLowerCase();
+      final email = (data['email'] ?? '').toString().toLowerCase();
+      final username = (data['username'] ?? '').toString().toLowerCase();
 
-    // 3. Search by 'displayName' (Capitalized - Common Case Fallback)
-    // Useful for finding "Shopnil" when searching "shopnil" if searchKey is missing.
-    List<DocumentSnapshot> capitalizedSnapshotDocs = [];
-    if (normalizedQuery.isNotEmpty) {
-      // Only if the query starts with a lowercase letter, we try capitalizing it.
-      // e.g. "shopnil" -> "Shopnil". "Shopnil" -> "Shopnil" (same, so no need re-query if step 2 covered it)
-      final capitalizedQuery =
-          normalizedQuery[0].toUpperCase() +
-          normalizedQuery.substring(1).toLowerCase();
+      // Match if query is found anywhere in name, email, or username
+      return displayName.contains(normalizedQuery) ||
+          email.contains(normalizedQuery) ||
+          username.contains(normalizedQuery);
+    }).toList();
 
-      if (capitalizedQuery != normalizedQuery) {
-        final snapshot = await _firestoreService
-            .getCollectionStream(
-              _collectionPath,
-              queryBuilder: (query) => query
-                  .where(
-                    'displayName',
-                    isGreaterThanOrEqualTo: capitalizedQuery,
-                  )
-                  .where('displayName', isLessThan: capitalizedQuery + '\uf8ff')
-                  .limit(20),
-            )
-            .first;
-        capitalizedSnapshotDocs = snapshot.docs;
-      }
-    }
-
-    // Merge results to avoid duplicates
-    final Map<String, DocumentSnapshot> mergedDocs = {};
-
-    for (var doc in searchKeySnapshot.docs) mergedDocs[doc.id] = doc;
-    for (var doc in displayNameSnapshot.docs) {
-      if (!mergedDocs.containsKey(doc.id)) mergedDocs[doc.id] = doc;
-    }
-    for (var doc in capitalizedSnapshotDocs) {
-      if (!mergedDocs.containsKey(doc.id)) mergedDocs[doc.id] = doc;
-    }
-
-    return mergedDocs.values.toList();
+    return filtered;
   }
 }

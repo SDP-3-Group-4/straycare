@@ -10,6 +10,7 @@ import 'chat_info_screen.dart';
 import '../../home/widgets/user_profile_dialog.dart';
 import 'package:straycare_demo/shared/widgets/verified_badge.dart';
 import '../../../../services/ai_service.dart';
+import '../../../../services/presence_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final Chat chat;
@@ -167,16 +168,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         );
       }
 
-      // Auto-scroll to bottom
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      // Auto-scroll logic is no longer needed with reverse: true
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -215,6 +207,46 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   fontSize: 12,
                   fontWeight: FontWeight.normal,
                 ),
+              ),
+            // Active status for direct chats (not group, not bot)
+            if (!widget.chat.isAiBot &&
+                !_isGroup &&
+                _participantIds.length == 2)
+              StreamBuilder<Map<String, dynamic>>(
+                stream: PresenceService().getUserPresence(
+                  _participantIds.firstWhere(
+                    (id) => id != _currentUserId,
+                    orElse: () => '',
+                  ),
+                ),
+                builder: (context, snapshot) {
+                  final isOnline = snapshot.data?['isOnline'] ?? false;
+                  final lastSeen = snapshot.data?['lastSeen'];
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isOnline ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isOnline
+                            ? 'Active now'
+                            : PresenceService.formatLastSeen(lastSeen),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                          color: isOnline ? Colors.green : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
           ],
         ),
@@ -296,23 +328,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   );
                 }
 
-                // Scroll to bottom on initial load / new message
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                });
+                // Reverse the list so the newest message (last in original list) becomes the first (bottom)
+                // This, combined with reverse: true in ListView, ensures "stick to bottom" behavior.
+                final reversedMessages = messages.reversed.toList();
 
                 return ListView.builder(
                   controller: _scrollController,
+                  reverse: true, // Optimizes scrolling for chat
                   padding: const EdgeInsets.all(10),
-                  itemCount: messages.length,
+                  itemCount: reversedMessages.length,
                   itemBuilder: (context, index) {
-                    final message = messages[index];
+                    final message = reversedMessages[index];
                     return _buildMessageBubble(message);
                   },
                 );
@@ -450,12 +476,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   if (_isGroup && !isMe)
                     Padding(
                       padding: const EdgeInsets.only(left: 4, bottom: 4.0),
-                      child: Text(
-                        pData?['name'] ?? 'User',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                      child: GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => UserProfileDialog(
+                              userId: message.senderId,
+                              userName: pData?['name'] ?? 'User',
+                              userAvatarUrl: pData?['photoUrl'] ?? '',
+                              isVerified: pData?['isVerified'] ?? false,
+                            ),
+                          );
+                        },
+                        child: Text(
+                          pData?['name'] ?? 'User',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
+                          ),
                         ),
                       ),
                     ),
@@ -535,6 +574,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String _getTypingString(List<String> userIds) {
     if (userIds.isEmpty) return '';
     final names = userIds.map((id) {
+      if (id == 'anvil_1_beta') return 'StrayCare Vet Bot';
       final pData = _participantsData[id];
       return pData?['name'] ?? 'Someone';
     }).toList();

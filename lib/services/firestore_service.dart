@@ -72,14 +72,22 @@ class FirestoreService {
     }
   }
 
-  /// Get a single document
+  /// Get a single document (cache-first)
   Future<DocumentSnapshot> getDocument(
     String collectionPath,
-    String docId,
-  ) async {
+    String docId, {
+    bool cacheFirst = false,
+  }) async {
     try {
-      return await _db.collection(collectionPath).doc(docId).get();
+      final options = cacheFirst
+          ? const GetOptions(source: Source.cache)
+          : const GetOptions(source: Source.serverAndCache);
+      return await _db.collection(collectionPath).doc(docId).get(options);
     } catch (e) {
+      // If cache fails, fallback to server
+      if (cacheFirst) {
+        return await _db.collection(collectionPath).doc(docId).get();
+      }
       throw Exception('Error getting document: $e');
     }
   }
@@ -104,16 +112,28 @@ class FirestoreService {
     return query.snapshots();
   }
 
-  /// Get a future of a query
+  /// Get a future of a query (cache-first option)
   Future<QuerySnapshot> getCollection(
     String collectionPath, {
     Query Function(Query)? queryBuilder,
+    bool cacheFirst = false,
   }) async {
     Query query = _db.collection(collectionPath);
     if (queryBuilder != null) {
       query = queryBuilder(query);
     }
-    return await query.get();
+    try {
+      final options = cacheFirst
+          ? const GetOptions(source: Source.cache)
+          : const GetOptions(source: Source.serverAndCache);
+      return await query.get(options);
+    } catch (e) {
+      // If cache fails, fallback to server
+      if (cacheFirst) {
+        return await query.get();
+      }
+      rethrow;
+    }
   }
 
   /// Get the count of documents in a query

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:straycare_demo/features/notifications/repositories/notification_repository.dart';
 import 'package:straycare_demo/features/profile/repositories/user_repository.dart';
 import 'package:straycare_demo/features/home/screens/post_detail_screen.dart';
+import 'package:straycare_demo/features/home/widgets/user_profile_dialog.dart';
 import 'package:straycare_demo/services/auth_service.dart';
 
 // --- SCREEN 4: NOTIFICATIONS ---
@@ -293,14 +294,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    backgroundImage: avatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(avatarUrl)
-                        : null,
-                    backgroundColor: _getIconColor(type),
-                    child: avatarUrl.isEmpty
-                        ? Icon(_getIcon(type), color: Colors.white, size: 20)
-                        : null,
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => UserProfileDialog(
+                          userId: fromUserId,
+                          userName: name,
+                          userAvatarUrl: avatarUrl,
+                          isVerified: false,
+                        ),
+                      );
+                    },
+                    child: CircleAvatar(
+                      backgroundImage: avatarUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(avatarUrl)
+                          : null,
+                      backgroundColor: _getIconColor(type),
+                      child: avatarUrl.isEmpty
+                          ? Icon(_getIcon(type), color: Colors.white, size: 20)
+                          : null,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -359,9 +373,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       future: _userRepository.getUser(fromUserId),
       builder: (context, userSnapshot) {
         String avatarUrl = '';
+        String name = 'User';
         if (userSnapshot.hasData && userSnapshot.data!.exists) {
           final userData = userSnapshot.data!.data() as Map<String, dynamic>;
           avatarUrl = userData['photoUrl'] ?? '';
+          name = userData['displayName'] ?? 'User';
         }
 
         return Card(
@@ -389,18 +405,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        backgroundImage: avatarUrl.isNotEmpty
-                            ? CachedNetworkImageProvider(avatarUrl)
-                            : null,
-                        backgroundColor: _getIconColor(type),
-                        child: avatarUrl.isEmpty
-                            ? Icon(
-                                _getIcon(type),
-                                color: Colors.white,
-                                size: 20,
-                              )
-                            : null,
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => UserProfileDialog(
+                              userId: fromUserId,
+                              userName: name,
+                              userAvatarUrl: avatarUrl,
+                              isVerified: false,
+                            ),
+                          );
+                        },
+                        child: CircleAvatar(
+                          backgroundImage: avatarUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(avatarUrl)
+                              : null,
+                          backgroundColor: _getIconColor(type),
+                          child: avatarUrl.isEmpty
+                              ? Icon(
+                                  _getIcon(type),
+                                  color: Colors.white,
+                                  size: 20,
+                                )
+                              : null,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

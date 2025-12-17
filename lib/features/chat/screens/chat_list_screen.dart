@@ -8,6 +8,7 @@ import '../repositories/chat_repository.dart';
 import 'chat_detail_screen.dart';
 import 'user_search_screen.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../services/presence_service.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -332,7 +333,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
             padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
-                Stack(children: [ClipOval(child: _buildAvatar(chat))]),
+                Stack(
+                  children: [
+                    ClipOval(child: _buildAvatar(chat)),
+                    // Online indicator for direct chats only
+                    if (!chat.isGroup &&
+                        chat.participantIds != null &&
+                        chat.participantIds!.length == 2)
+                      StreamBuilder<Map<String, dynamic>>(
+                        stream: PresenceService().getUserPresence(
+                          chat.participantIds!.firstWhere(
+                            (id) => id != _currentUserId,
+                            orElse: () => '',
+                          ),
+                        ),
+                        builder: (context, snapshot) {
+                          final isOnline = snapshot.data?['isOnline'] ?? false;
+                          if (!isOnline) return const SizedBox.shrink();
+                          return Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

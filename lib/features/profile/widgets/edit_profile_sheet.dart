@@ -10,6 +10,7 @@ class EditProfileSheet extends StatefulWidget {
 }
 
 class _EditProfileSheetState extends State<EditProfileSheet> {
+  final _displayNameController = TextEditingController();
   final _bioController = TextEditingController();
   final _petNameController = TextEditingController();
   final _petBreedController = TextEditingController();
@@ -20,6 +21,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   final UserRepository _userRepository = UserRepository();
   final AuthService _authService = AuthService();
   bool _isLoading = false;
+  bool _hasChangedDisplayName = false;
+  String _originalDisplayName = '';
 
   @override
   void initState() {
@@ -36,6 +39,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         setState(() {
+          _displayNameController.text =
+              data['displayName'] ??
+              _authService.currentUser?.displayName ??
+              '';
+          _originalDisplayName = _displayNameController.text;
+          _hasChangedDisplayName = data['hasChangedDisplayName'] ?? false;
           _bioController.text = data['bio'] ?? '';
           if (data['petDetails'] != null) {
             final pet = data['petDetails'] as Map<String, dynamic>;
@@ -53,6 +62,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _bioController.dispose();
     _petNameController.dispose();
     _petBreedController.dispose();
@@ -77,9 +87,27 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       };
 
       final userData = {
+        'displayName': _displayNameController.text.trim(),
         'bio': _bioController.text.trim(),
         'petDetails': petDetails,
       };
+
+      // Check if display name was changed (one-time only)
+      final newDisplayName = _displayNameController.text.trim();
+      final displayNameChanged =
+          !_hasChangedDisplayName &&
+          newDisplayName.isNotEmpty &&
+          newDisplayName != _originalDisplayName;
+
+      if (displayNameChanged) {
+        userData['hasChangedDisplayName'] = true;
+      }
+
+      // Also update Firebase Auth display name (only if allowed)
+      if (displayNameChanged) {
+        await _authService.currentUser?.updateDisplayName(newDisplayName);
+        await _authService.currentUser?.reload();
+      }
 
       // Check if user exists first to decide between set (merge) or update
       // For simplicity, we'll use saveUser which uses set (overwrite) in my implementation
@@ -166,6 +194,69 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             const SizedBox(height: 10),
 
             const SizedBox(height: 0),
+
+            // Display Name Section
+            Row(
+              children: [
+                Text(
+                  'Display Name',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (_hasChangedDisplayName)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Icon(Icons.lock, size: 16, color: Colors.grey[500]),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!_hasChangedDisplayName)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber,
+                      size: 20,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'You can only change your display name once!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber[800],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            TextField(
+              controller: _displayNameController,
+              enabled: !_hasChangedDisplayName,
+              decoration: InputDecoration(
+                hintText: _hasChangedDisplayName
+                    ? 'Display name cannot be changed'
+                    : 'Your display name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: _hasChangedDisplayName,
+                fillColor: _hasChangedDisplayName
+                    ? Colors.grey.withOpacity(0.1)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Bio Section
             Text('Bio', style: Theme.of(context).textTheme.titleMedium),

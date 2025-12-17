@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart'; // Import Geolocator
+import 'package:image_picker/image_picker.dart';
+import '../../shared/widgets/image_crop_screen.dart';
+import 'dart:io';
 
 import 'package:straycare_demo/features/settings/settings_screen.dart';
 import 'package:straycare_demo/features/profile/widgets/edit_profile_sheet.dart';
@@ -20,6 +23,7 @@ import 'package:straycare_demo/features/home/widgets/post_card.dart';
 import 'package:straycare_demo/shared/enums.dart';
 import 'package:straycare_demo/shared/widgets/verified_badge.dart';
 import '../../l10n/app_localizations.dart';
+import '../../../services/cloudinary_service.dart';
 
 // --- SCREEN 5: PROFILE ---
 class ProfileScreen extends StatefulWidget {
@@ -121,6 +125,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } catch (_) {
       return PostCategory.rescue;
+    }
+  }
+
+  Future<void> _pickAndUploadProfilePicture() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Navigate to crop screen
+      final File? croppedFile = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImageCropScreen(imageFile: File(image.path)),
+        ),
+      );
+
+      if (croppedFile == null) return;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Uploading photo...')));
+
+      // Upload to Cloudinary
+      final cloudinaryService = CloudinaryService();
+      final imageUrl = await cloudinaryService.uploadImage(croppedFile);
+
+      // Update Firestore
+      if (_user != null) {
+        await _userRepository.updateUser(_user!.uid, {'photoUrl': imageUrl});
+
+        // Update Firebase Auth profile
+        await _user!.updatePhotoURL(imageUrl);
+        await _user!.reload();
+
+        if (mounted) {
+          setState(() {
+            _user = FirebaseAuth.instance.currentUser;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -506,21 +573,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             bottom: 0,
                                             right: 0,
                                             child: InkWell(
-                                              onTap: () {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      AppLocalizations.of(
-                                                        context,
-                                                      ).translate(
-                                                        'dp_upload_coming_soon',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
+                                              onTap:
+                                                  _pickAndUploadProfilePicture,
                                               child: Container(
                                                 padding: const EdgeInsets.all(
                                                   6,

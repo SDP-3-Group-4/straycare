@@ -234,7 +234,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
               controller: _searchController,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Search connections...',
+                hintText: 'Search all users...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),

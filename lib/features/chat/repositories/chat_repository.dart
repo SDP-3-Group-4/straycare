@@ -107,6 +107,8 @@ class ChatRepository {
                 iconEmoji: data['iconEmoji'],
                 isVerified: isVerified,
                 lastMessageSenderId: data['lastMessageSenderId'],
+                isGroup: data['type'] == 'group',
+                participantIds: List<String>.from(data['participants'] ?? []),
               ),
             );
           }
@@ -224,26 +226,26 @@ class ChatRepository {
           if (uid != senderId) {
             final userDoc = await _firestore.collection('users').doc(uid).get();
             if (userDoc.exists) {
-               final userData = userDoc.data();
-               final String? token = userData?['fcmToken'];
- 
-               print('User $uid token: $token'); // DEBUG
- 
-               if (token != null && token.isNotEmpty) {
-                  print('Attempting to send push to $uid'); // DEBUG
-                  await NotificationService().sendNotification(
-                    recipientToken: token,
-                    title: senderName,
-                    body: content,
-                    data: {
-                      'type': 'chat',
-                      'chatId': chatId,
-                      'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-                    },
-                  );
-               } else {
-                 print('No token found for user $uid'); // DEBUG
-               }
+              final userData = userDoc.data();
+              final String? token = userData?['fcmToken'];
+
+              print('User $uid token: $token'); // DEBUG
+
+              if (token != null && token.isNotEmpty) {
+                print('Attempting to send push to $uid'); // DEBUG
+                await NotificationService().sendNotification(
+                  recipientToken: token,
+                  title: senderName,
+                  body: content,
+                  data: {
+                    'type': 'chat',
+                    'chatId': chatId,
+                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                  },
+                );
+              } else {
+                print('No token found for user $uid'); // DEBUG
+              }
             } else {
               print('User document not found for $uid'); // DEBUG
             }
