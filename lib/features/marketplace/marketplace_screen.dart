@@ -490,7 +490,9 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: TextField(
@@ -500,12 +502,26 @@ class _MarketplaceHeaderDelegate extends SliverPersistentHeaderDelegate {
                         hintText: AppLocalizations.of(
                           context,
                         ).translate('search_services'),
-                        prefixIcon: const Icon(Icons.search, size: 20),
+                        hintStyle: TextStyle(
+                          color: theme.brightness == Brightness.dark
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 20,
+                          color: theme.brightness == Brightness.dark
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
+                        ),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(horizontal: 16),
                         isDense: true,
                       ),
-                      style: const TextStyle(fontSize: 14),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                     ),
                   ),
                 ),

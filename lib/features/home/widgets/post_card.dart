@@ -70,6 +70,9 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
+  // Static cache for user data across all PostCards
+  static final Map<String, Map<String, dynamic>?> _userCache = {};
+
   // Local state for optimistic UI updates
   late bool _isLiked;
   late int _currentLikes;
@@ -80,6 +83,11 @@ class _PostCardState extends State<PostCard> {
   late double _currentRaisedAmount;
   late int _currentDonorCount;
 
+  // Cached user data
+  String? _cachedPhotoUrl;
+  String? _cachedDisplayName;
+  bool? _cachedIsVerified;
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +97,42 @@ class _PostCardState extends State<PostCard> {
     _isSaved = widget.isSaved;
     _currentRaisedAmount = widget.raisedAmount ?? 0;
     _currentDonorCount = widget.donorCount ?? 0;
+    _loadCachedUserData();
+  }
+
+  void _loadCachedUserData() {
+    // Check cache first
+    if (_userCache.containsKey(widget.userId)) {
+      final cached = _userCache[widget.userId];
+      if (cached != null) {
+        _cachedPhotoUrl = cached['photoUrl'];
+        _cachedDisplayName = cached['displayName'];
+        _cachedIsVerified = cached['verifiedStatus'];
+      }
+      return;
+    }
+
+    // Fetch from Firestore if not cached
+    if (widget.userId.isNotEmpty) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get()
+          .then((doc) {
+            if (doc.exists && mounted) {
+              final data = doc.data();
+              _userCache[widget.userId] = data;
+              setState(() {
+                _cachedPhotoUrl = data?['photoUrl'];
+                _cachedDisplayName = data?['displayName'];
+                _cachedIsVerified = data?['verifiedStatus'];
+              });
+            }
+          })
+          .catchError((e) {
+            // Silently fail, use widget defaults
+          });
+    }
   }
 
   @override
@@ -246,147 +290,130 @@ class _PostCardState extends State<PostCard> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            StreamBuilder<DocumentSnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(widget.userId)
-                                  .snapshots(),
-                              builder: (context, snapshot) {
-                                // Get live photo URL and display name or fall back to stored values
-                                String photoUrl = widget.userAvatarUrl;
-                                String displayName = widget.userName;
-                                bool isVerified = widget.isAuthorVerified;
-
-                                if (snapshot.hasData && snapshot.data!.exists) {
-                                  final userData =
-                                      snapshot.data!.data()
-                                          as Map<String, dynamic>?;
-                                  photoUrl =
-                                      userData?['photoUrl'] ??
-                                      widget.userAvatarUrl;
-                                  displayName =
-                                      userData?['displayName'] ??
-                                      widget.userName;
-                                  isVerified =
-                                      userData?['verifiedStatus'] ??
-                                      widget.isAuthorVerified;
-                                }
-
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 20,
-                                      backgroundImage: photoUrl.isNotEmpty
-                                          ? CachedNetworkImageProvider(photoUrl)
-                                          : null,
-                                      backgroundColor: Theme.of(context)
-                                          .colorScheme
-                                          .secondary
-                                          .withValues(alpha: 0.2),
-                                      child: photoUrl.isEmpty
-                                          ? const Icon(Icons.person)
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: <Widget>[
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  displayName,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundImage:
+                                        (_cachedPhotoUrl ??
+                                                widget.userAvatarUrl)
+                                            .isNotEmpty
+                                        ? CachedNetworkImageProvider(
+                                            _cachedPhotoUrl ??
+                                                widget.userAvatarUrl,
+                                          )
+                                        : null,
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .secondary
+                                        .withValues(alpha: 0.2),
+                                    child:
+                                        (_cachedPhotoUrl ??
+                                                widget.userAvatarUrl)
+                                            .isEmpty
+                                        ? const Icon(Icons.person)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                _cachedDisplayName ??
+                                                    widget.userName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                              if (isVerified)
-                                                const VerifiedBadge(size: 14),
-                                            ],
-                                          ),
-                                          Wrap(
-                                            crossAxisAlignment:
-                                                WrapCrossAlignment.center,
-                                            children: [
+                                            ),
+                                            if (_cachedIsVerified ??
+                                                widget.isAuthorVerified)
+                                              const VerifiedBadge(size: 14),
+                                          ],
+                                        ),
+                                        Wrap(
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            Text(
+                                              widget.timeAgo,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            if (widget.isEdited) ...[
+                                              const SizedBox(width: 4),
                                               Text(
-                                                widget.timeAgo,
+                                                '(Edited)',
                                                 style: const TextStyle(
                                                   color: Colors.grey,
                                                   fontSize: 12,
+                                                  fontStyle: FontStyle.italic,
                                                 ),
                                               ),
-                                              if (widget.isEdited) ...[
+                                            ],
+                                          ],
+                                        ),
+                                        if (widget.location.isNotEmpty)
+                                          InkWell(
+                                            onTap: () async {
+                                              final query = Uri.encodeComponent(
+                                                widget.location,
+                                              );
+                                              final url = Uri.parse(
+                                                'https://www.google.com/maps/search/?api=1&query=$query',
+                                              );
+                                              try {
+                                                if (await canLaunchUrl(url)) {
+                                                  await launchUrl(
+                                                    url,
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                debugPrint(
+                                                  'Error launching maps: \$e',
+                                                );
+                                              }
+                                            },
+                                            child: Row(
+                                              children: <Widget>[
+                                                Icon(
+                                                  Icons.location_on,
+                                                  size: 12,
+                                                ),
                                                 const SizedBox(width: 4),
-                                                Text(
-                                                  '(Edited)',
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 12,
-                                                    fontStyle: FontStyle.italic,
+                                                Expanded(
+                                                  child: Text(
+                                                    widget.location,
+                                                    style: TextStyle(
+                                                      color: Colors.grey[600],
+                                                      fontSize: 12,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
-                                            ],
-                                          ),
-                                          if (widget.location.isNotEmpty)
-                                            InkWell(
-                                              onTap: () async {
-                                                final query =
-                                                    Uri.encodeComponent(
-                                                      widget.location,
-                                                    );
-                                                final url = Uri.parse(
-                                                  'https://www.google.com/maps/search/?api=1&query=$query',
-                                                );
-                                                try {
-                                                  if (await canLaunchUrl(url)) {
-                                                    await launchUrl(
-                                                      url,
-                                                      mode: LaunchMode
-                                                          .externalApplication,
-                                                    );
-                                                  }
-                                                } catch (e) {
-                                                  debugPrint(
-                                                    'Error launching maps: \$e',
-                                                  );
-                                                }
-                                              },
-                                              child: Row(
-                                                children: <Widget>[
-                                                  Icon(
-                                                    Icons.location_on,
-                                                    size: 12,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: Text(
-                                                      widget.location,
-                                                      style: TextStyle(
-                                                        color: Colors.grey[600],
-                                                        fontSize: 12,
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
                                             ),
-                                        ],
-                                      ),
+                                          ),
+                                      ],
                                     ),
-                                  ],
-                                );
-                              },
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
